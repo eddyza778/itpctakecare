@@ -50,8 +50,8 @@
 ## 🛠️ สแต็กเทคโนโลยี (Tech Stack)
 
 - **Frontend**: Next.js 16 (App Router) + TypeScript + Tailwind CSS
-- **Database**: Supabase (PostgreSQL) ผ่าน Client Library `@supabase/supabase-js` โดยใช้ **anon key เท่านั้น**
-- **Authentication**: PIN Authentication ผ่าน Supabase RPC (`verify_pin`) ไม่ใช้ Supabase Auth
+- **Database & Architecture**: Supabase (PostgreSQL) ผ่าน **Next.js Server Actions (`'use server'`)** โดยรันคำสั่งทั้งหมดบนเซิร์ฟเวอร์ Node.js เบราว์เซอร์จะไม่ติดต่อกับ Supabase โดยตรง จึงไม่ส่ง Apikey / Authorization Header หลุดไปใน Network Tab ของผู้ใช้
+- **Authentication**: PIN Authentication ผ่าน Supabase RPC (`verify_pin`) บนเซิร์ฟเวอร์
 - **Icons**: Lucide React
 - **Exporting**: jsPDF, html2canvas, XLSX (SheetJS)
 - **Date Handling**: date-fns (พร้อม locale ภาษาไทย)
