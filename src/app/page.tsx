@@ -125,18 +125,18 @@ export default function CalendarPage() {
     const weekDays = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
     return (
-      <div style={{ padding: '0 12px' }}>
+      <div style={{ padding: 0, width: '100%', overflow: 'hidden' }}>
         {/* วันในสัปดาห์ */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '4px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '2px', marginBottom: '4px', width: '100%' }}>
           {weekDays.map((d) => (
-            <div key={d} style={{ textAlign: 'center', fontSize: '0.75rem', color: '#9e9690', padding: '6px 0', fontWeight: 500 }}>
+            <div key={d} style={{ textAlign: 'center', fontSize: '0.75rem', color: '#9e9690', padding: '6px 0', fontWeight: 500, minWidth: 0 }}>
               {d}
             </div>
           ))}
         </div>
 
         {/* ตารางวัน */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '2px', width: '100%' }}>
           {days.map((day) => {
             const dayEvents = getEventsForDate(day);
             const inMonth = isSameMonth(day, currentDate);
@@ -164,9 +164,9 @@ export default function CalendarPage() {
                 role="button"
                 tabIndex={0}
                 title={`ดูเคสวันที่ ${format(day, 'd MMMM yyyy', { locale: th })} (${dayEvents.length} เคส)`}
+                className="cal-day-cell"
                 style={{
-                  minHeight: '74px',
-                  padding: '4px',
+                  padding: '2px',
                   borderRadius: 'var(--radius-sm)',
                   background: today ? 'var(--lavender)' : inMonth ? 'var(--card-bg)' : 'transparent',
                   border: today ? '1.5px solid var(--primary-light)' : '1px solid var(--border-light)',
@@ -175,6 +175,10 @@ export default function CalendarPage() {
                   transition: 'background-color 0.15s, border-color 0.15s',
                   display: 'flex',
                   flexDirection: 'column',
+                  minWidth: 0,
+                  width: '100%',
+                  overflow: 'hidden',
+                  boxSizing: 'border-box',
                 }}
               >
                 <div style={{
@@ -185,6 +189,8 @@ export default function CalendarPage() {
                   fontWeight: today ? 600 : 400,
                   color: today ? 'var(--primary-dark)' : 'var(--foreground)',
                   marginBottom: '2px',
+                  minWidth: 0,
+                  padding: '0 2px',
                 }}>
                   <span>{format(day, 'd')}</span>
                   {dayEvents.length > 0 && (
@@ -193,10 +199,11 @@ export default function CalendarPage() {
                         fontSize: '0.625rem',
                         background: today ? 'var(--primary)' : '#ede4f3',
                         color: today ? '#fff' : 'var(--primary-dark)',
-                        padding: '0 4px',
+                        padding: '0 3px',
                         borderRadius: '10px',
                         fontWeight: 600,
                         lineHeight: '13px',
+                        flexShrink: 0,
                       }}
                     >
                       {dayEvents.length}
@@ -204,7 +211,7 @@ export default function CalendarPage() {
                   )}
                 </div>
 
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, width: '100%', overflow: 'hidden' }}>
                   {caseTypes.slice(0, 2).map((ct) => {
                     const isOrange = !ct.allDone; // ถ้ามีเคสที่ยังไม่เสร็จ -> สีส้ม
                     return (
@@ -213,46 +220,46 @@ export default function CalendarPage() {
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '4px',
+                          gap: '2px',
                           width: '100%',
-                          padding: '2px 5px',
-                          borderRadius: '4px',
-                          fontSize: '0.625rem',
-                          lineHeight: '1.3',
+                          minWidth: 0,
+                          padding: '1px 3px',
+                          borderRadius: '3px',
+                          fontSize: '0.5625rem',
+                          lineHeight: '1.2',
                           fontFamily: 'inherit',
                           fontWeight: 500,
                           backgroundColor: isOrange ? '#ffedd5' : '#d4f0e7',
                           color: isOrange ? '#c2410c' : '#2e6b52',
                           border: isOrange ? '1px solid #fdba74' : '1px solid #a7f3d0',
                           overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
+                          boxSizing: 'border-box',
                         }}
                         title={`${ct.label} (${ct.count} เคส, ${ct.allDone ? 'เสร็จสิ้นทั้งหมด' : 'ยังไม่เสร็จสิ้น'})`}
                       >
                         <span
                           style={{
-                            width: '5px',
-                            height: '5px',
+                            width: '4px',
+                            height: '4px',
                             borderRadius: '50%',
                             backgroundColor: isOrange ? '#ea580c' : '#10b981',
                             flexShrink: 0,
                           }}
                         />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
                           {ct.label}
                         </span>
                         {ct.count > 1 && (
                           <span
                             style={{
-                              fontSize: '0.625rem',
+                              fontSize: '0.5625rem',
                               fontWeight: 700,
-                              padding: '0 4px',
-                              borderRadius: '4px',
+                              padding: '0 2px',
+                              borderRadius: '2px',
                               backgroundColor: isOrange ? '#fed7aa' : '#bbf0dd',
                               color: isOrange ? '#9a3412' : '#1d5440',
                               flexShrink: 0,
-                              lineHeight: '13px',
+                              lineHeight: '11px',
                             }}
                           >
                             +{ct.count}
@@ -264,18 +271,23 @@ export default function CalendarPage() {
                   {caseTypes.length > 2 && (
                     <div
                       style={{
-                        padding: '1px 5px',
-                        fontSize: '0.625rem',
-                        color: caseTypes.slice(2).some((c) => !c.allDone) ? '#c2410c' : '#9e9690',
+                        padding: '1px 2px',
+                        fontSize: '0.5rem',
+                        textAlign: 'center',
+                        color: caseTypes.slice(2).some((c) => !c.allDone) ? '#c2410c' : '#8a8280',
                         backgroundColor: caseTypes.slice(2).some((c) => !c.allDone) ? '#ffedd5' : 'var(--lavender)',
                         border: caseTypes.slice(2).some((c) => !c.allDone) ? '1px solid #fdba74' : 'none',
-                        borderRadius: '3px',
+                        borderRadius: '2px',
                         fontWeight: 600,
-                        lineHeight: '1.3',
+                        lineHeight: '1.1',
+                        overflow: 'hidden',
+                        whiteSpace: 'nowrap',
+                        textOverflow: 'ellipsis',
+                        minWidth: 0,
                       }}
                       title={`ยังมีอีก ${caseTypes.length - 2} ประเภท`}
                     >
-                      +{caseTypes.length - 2} อื่นๆ
+                      +{caseTypes.length - 2}
                     </div>
                   )}
                 </div>
@@ -293,7 +305,7 @@ export default function CalendarPage() {
     const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
     return (
-      <div style={{ padding: '0 12px' }}>
+      <div style={{ padding: 0 }}>
         {days.map((day) => {
           const dayEvents = getEventsForDate(day);
           const today = isToday(day);
@@ -348,39 +360,40 @@ export default function CalendarPage() {
                     ไม่มีเคส
                   </div>
                 )}
-                {dayEvents.map((ev) => (
-                  <button
-                    key={ev.id}
-                    onClick={() => router.push(`/cases/${ev.id}`)}
-                    className="card"
-                    style={{
-                      display: 'block',
-                      width: '100%',
-                      padding: '10px 12px',
-                      marginBottom: '6px',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      fontFamily: 'inherit',
-                      border: '1px solid var(--border)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-                      <span className={`status-badge status-${ev.status}`}>
-                        <span className="status-dot" />
-                        {ev.status === 'planned' ? 'วางแผน' : 'เสร็จสิ้น'}
-                      </span>
-                      <span style={{ fontSize: '0.75rem', color: '#9e9690' }}>
-                        {safeFormatDate(ev.scheduled_at, 'HH:mm น.')}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>
-                      {getLabel(ev)}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#9e9690' }}>
-                      {ev.student_count} คน
-                    </div>
-                  </button>
-                ))}
+                <div className="cases-grid">
+                  {dayEvents.map((ev) => (
+                    <button
+                      key={ev.id}
+                      onClick={() => router.push(`/cases/${ev.id}`)}
+                      className="card"
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        padding: '10px 12px',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        fontFamily: 'inherit',
+                        border: '1px solid var(--border)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                        <span className={`status-badge status-${ev.status}`}>
+                          <span className="status-dot" />
+                          {ev.status === 'planned' ? 'วางแผน' : 'เสร็จสิ้น'}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: '#9e9690' }}>
+                          {safeFormatDate(ev.scheduled_at, 'HH:mm น.')}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                        {getLabel(ev)}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#9e9690' }}>
+                        {ev.student_count} คน
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           );
@@ -404,40 +417,41 @@ export default function CalendarPage() {
     }
 
     return (
-      <div style={{ padding: '0 12px' }}>
-        {sorted.map((ev) => (
-          <button
-            key={ev.id}
-            onClick={() => router.push(`/cases/${ev.id}`)}
-            className="card"
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '14px 16px',
-              marginBottom: '8px',
-              cursor: 'pointer',
-              textAlign: 'left',
-              fontFamily: 'inherit',
-              border: '1px solid var(--border)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span className={`status-badge status-${ev.status}`}>
-                <span className="status-dot" />
-                {ev.status === 'planned' ? 'วางแผน' : 'เสร็จสิ้น'}
-              </span>
-              <span style={{ fontSize: '0.75rem', color: '#9e9690' }}>
-                {safeFormatDate(ev.scheduled_at, 'd MMM yyyy HH:mm น.')}
-              </span>
-            </div>
-            <div style={{ fontSize: '0.9375rem', fontWeight: 500 }}>
-              {getLabel(ev)}
-            </div>
-            <div style={{ fontSize: '0.8125rem', color: '#9e9690' }}>
-              นักเรียน {ev.student_count} คน
-            </div>
-          </button>
-        ))}
+      <div style={{ padding: 0 }}>
+        <div className="cases-grid">
+          {sorted.map((ev) => (
+            <button
+              key={ev.id}
+              onClick={() => router.push(`/cases/${ev.id}`)}
+              className="card"
+              style={{
+                display: 'block',
+                width: '100%',
+                padding: '14px 16px',
+                cursor: 'pointer',
+                textAlign: 'left',
+                fontFamily: 'inherit',
+                border: '1px solid var(--border)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span className={`status-badge status-${ev.status}`}>
+                  <span className="status-dot" />
+                  {ev.status === 'planned' ? 'วางแผน' : 'เสร็จสิ้น'}
+                </span>
+                <span style={{ fontSize: '0.75rem', color: '#9e9690' }}>
+                  {safeFormatDate(ev.scheduled_at, 'd MMM yyyy HH:mm น.')}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.9375rem', fontWeight: 500 }}>
+                {getLabel(ev)}
+              </div>
+              <div style={{ fontSize: '0.8125rem', color: '#9e9690' }}>
+                นักเรียน {ev.student_count} คน
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     );
   };
@@ -447,10 +461,10 @@ export default function CalendarPage() {
     : format(currentDate, 'MMMM yyyy', { locale: th });
 
   return (
-    <div>
+    <div className="page-container" style={{ paddingBottom: '32px' }}>
       {/* Header */}
       <div style={{
-        padding: '16px 16px 0',
+        padding: '16px 0 0',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -474,7 +488,7 @@ export default function CalendarPage() {
 
       {/* Controls */}
       <div style={{
-        padding: '12px 16px',
+        padding: '12px 0',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -529,7 +543,7 @@ export default function CalendarPage() {
 
       {/* Month label + filter */}
       <div style={{
-        padding: '0 16px 12px',
+        padding: '0 0 12px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -550,7 +564,7 @@ export default function CalendarPage() {
 
       {error && (
         <div style={{
-          margin: '0 16px 12px',
+          margin: '0 0 12px',
           padding: '10px 14px',
           background: 'var(--rose)',
           color: 'var(--rose-text)',
@@ -588,10 +602,9 @@ export default function CalendarPage() {
 
       {/* Day Cases Modal — ดูเคสประจำวัน */}
       {selectedDay && (
-        <div className="modal-overlay" onClick={() => setSelectedDay(null)}>
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setSelectedDay(null)}>
           <div
             className="modal-content"
-            onClick={(e) => e.stopPropagation()}
             style={{ maxWidth: '480px', padding: '24px' }}
           >
             {/* Header */}

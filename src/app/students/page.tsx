@@ -92,14 +92,14 @@ export default function StudentsPage() {
   };
 
   return (
-    <div style={{ maxWidth: '640px', margin: '0 auto', paddingBottom: '90px' }}>
+    <div className="page-container" style={{ paddingBottom: '40px' }}>
       {/* Header */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          padding: '16px',
+          padding: '16px 0',
           borderBottom: '1px solid var(--border-light)',
           background: 'var(--card-bg)',
           position: 'sticky',
@@ -128,7 +128,7 @@ export default function StudentsPage() {
         </button>
       </div>
 
-      <div style={{ padding: '16px' }}>
+      <div style={{ padding: '16px 0' }}>
         {/* Search & Filters Card */}
         <div
           className="card"
@@ -267,7 +267,7 @@ export default function StudentsPage() {
             </p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div className="students-grid">
             {filtered.map((s) => {
               const initial = s.first_name_th ? s.first_name_th.charAt(0) : '?';
               const isFemale = s.gender === 'หญิง';

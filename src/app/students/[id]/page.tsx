@@ -120,7 +120,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
   if (!student) return null;
 
   return (
-    <div style={{ maxWidth: '680px', margin: '0 auto', paddingBottom: '90px' }}>
+    <div className="page-container" style={{ maxWidth: '860px', paddingBottom: '40px' }}>
       {/* Header */}
       <div
         className="no-print"
@@ -128,7 +128,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          padding: '16px',
+          padding: '16px 0',
           borderBottom: '1px solid var(--border-light)',
           background: 'var(--card-bg)',
           position: 'sticky',
@@ -314,7 +314,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             </button>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div className="cases-grid">
             {cases.map((c) => {
               const typeLabel =
                 c.case_type === 'other' ? c.other_text || 'อื่นๆ' : CASE_TYPE_LABELS[c.case_type];

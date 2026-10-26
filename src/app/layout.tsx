@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 import { AppShell } from "@/components/AppShell";
@@ -6,6 +6,12 @@ import { AppShell } from "@/components/AppShell";
 export const metadata: Metadata = {
   title: "ITPC Techcare — ระบบดูแลนักเรียน",
   description: "เว็บแอปสำหรับครูที่ปรึกษาและผู้ดูแล ใช้บันทึกและติดตามการดูแลนักเรียนรายเคส",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
 };
 
 export default function RootLayout({

@@ -233,7 +233,7 @@ export async function getCalendarEvents(
   endDate: string,
   caretakerId?: string
 ): Promise<CalendarEvent[]> {
-  let query = supabase
+  const query = supabase
     .from('cases')
     .select('id, case_type, other_text, scheduled_at, status')
     .gte('scheduled_at', startDate)
@@ -244,29 +244,37 @@ export async function getCalendarEvents(
   if (error) throw error;
 
   const cases = data || [];
+  if (cases.length === 0) return [];
+
+  const caseIds = cases.map((c) => c.id);
+
+  // Batch fetch student counts and caretaker relations in parallel
+  const [{ data: csData }, ccRes] = await Promise.all([
+    supabase.from('case_students').select('case_id').in('case_id', caseIds),
+    caretakerId
+      ? supabase
+          .from('case_caretakers')
+          .select('case_id')
+          .in('case_id', caseIds)
+          .eq('caretaker_id', caretakerId)
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const studentCountMap = new Map<string, number>();
+  (csData || []).forEach((row) => {
+    studentCountMap.set(row.case_id, (studentCountMap.get(row.case_id) || 0) + 1);
+  });
+
+  const allowedCaseIds = ccRes.data ? new Set(ccRes.data.map((row) => row.case_id)) : null;
+
   const events: CalendarEvent[] = [];
-
   for (const c of cases) {
-    // ดึงจำนวนนักเรียน
-    const { count } = await supabase
-      .from('case_students')
-      .select('*', { count: 'exact', head: true })
-      .eq('case_id', c.id);
-
-    // ถ้ากรองตามผู้ดูแล
-    if (caretakerId) {
-      const { data: rel } = await supabase
-        .from('case_caretakers')
-        .select('caretaker_id')
-        .eq('case_id', c.id)
-        .eq('caretaker_id', caretakerId);
-
-      if (!rel || rel.length === 0) continue;
+    if (allowedCaseIds && !allowedCaseIds.has(c.id)) {
+      continue;
     }
-
     events.push({
       ...c,
-      student_count: count || 0,
+      student_count: studentCountMap.get(c.id) || 0,
     });
   }
 
@@ -345,11 +353,7 @@ export async function getStudentCases(studentId: string): Promise<CaseWithRelati
   const caseIds = (csData || []).map((cs) => cs.case_id);
   if (caseIds.length === 0) return [];
 
-  const cases: CaseWithRelations[] = [];
-  for (const cid of caseIds) {
-    const c = await getCaseById(cid);
-    cases.push(c);
-  }
+  const cases = await Promise.all(caseIds.map((cid) => getCaseById(cid)));
 
   // เรียงตาม scheduled_at desc
   cases.sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime());

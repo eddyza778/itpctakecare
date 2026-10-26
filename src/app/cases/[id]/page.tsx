@@ -178,13 +178,13 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
     : CASE_TYPE_LABELS[caseData.case_type];
 
   return (
-    <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+    <div className="page-container" style={{ maxWidth: '860px', paddingBottom: '40px' }}>
       {/* Header */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
-        padding: '16px',
+        padding: '16px 0',
         borderBottom: '1px solid var(--border-light)',
       }}>
         <button
@@ -247,7 +247,7 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      <div style={{ padding: '20px 16px' }}>
+      <div style={{ padding: '20px 0' }}>
         {/* สถานะ + ประเภท */}
         <div style={{ marginBottom: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>

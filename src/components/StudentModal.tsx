@@ -73,10 +73,9 @@ export function StudentModal({ student, onClose, onSaved }: Props) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div
         className="modal-content"
-        onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: '480px', padding: '24px' }}
       >
         <div

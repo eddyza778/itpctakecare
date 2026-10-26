@@ -22,7 +22,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <div className="app-content" style={{ paddingBottom: '68px' }}>
+      <div className="app-content">
         {children}
       </div>
       <BottomNav />

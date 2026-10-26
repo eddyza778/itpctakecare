@@ -16,11 +16,11 @@ export function safeFormatDate(
 }
 
 export function safeParseDate(dateStr: string | null | undefined): Date {
-  if (!dateStr) return new Date();
+  if (!dateStr) return new Date(NaN);
   try {
     const d = typeof dateStr === 'string' ? parseISO(dateStr) : new Date(dateStr);
-    return isNaN(d.getTime()) ? new Date() : d;
+    return isNaN(d.getTime()) ? new Date(NaN) : d;
   } catch {
-    return new Date();
+    return new Date(NaN);
   }
 }
