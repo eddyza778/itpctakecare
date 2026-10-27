@@ -72,15 +72,12 @@ export default function ReportsPage() {
         }}
       >
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary-dark)', marginBottom: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary-dark)' }}>
             <FileBarChart size={24} />
             <h1 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
               รายงานและสถิติภาพรวม
             </h1>
           </div>
-          <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-            โรงเรียนสาธิตมหาวิทยาลัยเชียงใหม่ ระดับอนุบาลและประถมศึกษา • ปีการศึกษา 2569
-          </p>
         </div>
 
         {/* Action buttons */}

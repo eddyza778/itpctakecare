@@ -638,9 +638,6 @@ export default function CalendarPage() {
               ปฏิทินโรงเรียน
             </h1>
           </div>
-          <p style={{ margin: '4px 0 0', fontSize: '0.813rem', color: 'var(--text-secondary)' }}>
-            โรงเรียนสาธิตมหาวิทยาลัยเชียงใหม่ ระดับอนุบาลและประถมศึกษา
-          </p>
         </div>
 
         {/* Action Buttons */}
