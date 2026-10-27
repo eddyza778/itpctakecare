@@ -4,8 +4,8 @@ import { AuthProvider } from "@/lib/auth";
 import { AppShell } from "@/components/AppShell";
 
 export const metadata: Metadata = {
-  title: "โรงเรียนสาธิตมหาวิทยาลัยเชียงใหม่ (อนุบาล-ประถม) — ระบบบริหารจัดการและปฏิทิน",
-  description: "ระบบบริหารจัดการและปฏิทินการดูแลนักเรียน โรงเรียนสาธิตมหาวิทยาลัยเชียงใหม่ ระดับอนุบาลและประถมศึกษา",
+  title: "itpctakecare",
+  description: "ITPC Take Care — ระบบบริหารจัดการและปฏิทินการดูแลนักเรียน",
 };
 
 export const viewport: Viewport = {
