@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   ChevronLeft,
   ChevronRight,
@@ -244,10 +245,24 @@ export default function CalendarPage() {
         >
           {days.map((day) => {
             const dayCases = getCasesForDate(day);
-            const daySchoolEvents = getSchoolEventsForDate(day);
             const inMonth = isSameMonth(day, currentDate);
             const today = isToday(day);
             const totalCount = dayCases.length;
+
+            // รวมประเภทเคสในวันนี้: แสดงแค่ประเภทเคส และหากประเภทไหนยังไม่เสร็จสิ้นจะแสดงสีส้ม (+count เมื่อมีมากกว่า 1 เคส)
+            const typeMap = new Map<string, { label: string; allDone: boolean; count: number }>();
+            for (const ev of dayCases) {
+              const label = getLabel(ev);
+              const isEvDone = ev.status === 'done';
+              const existing = typeMap.get(label);
+              if (!existing) {
+                typeMap.set(label, { label, allDone: isEvDone, count: 1 });
+              } else {
+                existing.count += 1;
+                if (!isEvDone) existing.allDone = false;
+              }
+            }
+            const caseTypes = Array.from(typeMap.values());
 
             return (
               <div
@@ -256,6 +271,7 @@ export default function CalendarPage() {
                 role="button"
                 tabIndex={0}
                 className="cal-day-cell"
+                title={`ดูเคสวันที่ ${format(day, 'd MMMM yyyy', { locale: th })} (${totalCount} เคส)`}
                 style={{
                   padding: '4px 5px',
                   borderRadius: 'var(--radius-md)',
@@ -316,17 +332,13 @@ export default function CalendarPage() {
                   )}
                 </div>
 
-                {/* Badges / Items ในช่องวัน (เคสดูแลนักเรียน) */}
+                {/* Badges / Items ในช่องวัน (เคสดูแลนักเรียน - จัดกลุ่มตามประเภท) */}
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '3px', overflow: 'hidden' }}>
-                  {dayCases.slice(0, 3).map((cev) => {
-                    const isDone = cev.status === 'done';
+                  {caseTypes.slice(0, 2).map((ct) => {
+                    const isOrange = !ct.allDone; // ถ้ามีเคสที่ยังไม่เสร็จ -> สีส้ม
                     return (
                       <div
-                        key={cev.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/cases/${cev.id}`);
-                        }}
+                        key={ct.label}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -336,46 +348,63 @@ export default function CalendarPage() {
                           fontSize: '0.625rem',
                           lineHeight: '1.25',
                           fontWeight: 500,
-                          backgroundColor: isDone ? '#e8f7f0' : '#fef7e6',
-                          color: isDone ? '#276749' : '#c05621',
-                          border: isDone ? '1px solid #a7e4cb' : '1px solid #fbd38d',
+                          backgroundColor: isOrange ? '#ffedd5' : '#d4f0e7',
+                          color: isOrange ? '#c2410c' : '#2e6b52',
+                          border: isOrange ? '1px solid #fdba74' : '1px solid #a7f3d0',
                           overflow: 'hidden',
                           whiteSpace: 'nowrap',
-                          textOverflow: 'ellipsis',
                         }}
-                        title={`เคส: ${getLabel(cev)} (${cev.student_count} คน)`}
+                        title={`${ct.label} (${ct.count} เคส, ${ct.allDone ? 'เสร็จสิ้นทั้งหมด' : 'ยังไม่เสร็จสิ้น'})`}
                       >
                         <span
                           style={{
                             width: '5px',
                             height: '5px',
                             borderRadius: '50%',
-                            backgroundColor: isDone ? '#38a169' : '#dd6b20',
+                            backgroundColor: isOrange ? '#ea580c' : '#10b981',
                             flexShrink: 0,
                           }}
                         />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {getLabel(cev)}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                          {ct.label}
                         </span>
+                        {ct.count > 1 && (
+                          <span
+                            style={{
+                              fontSize: '0.625rem',
+                              fontWeight: 700,
+                              padding: '0 4px',
+                              borderRadius: '4px',
+                              backgroundColor: isOrange ? '#fed7aa' : '#bbf0dd',
+                              color: isOrange ? '#9a3412' : '#1d5440',
+                              flexShrink: 0,
+                              lineHeight: '13px',
+                            }}
+                          >
+                            +{ct.count}
+                          </span>
+                        )}
                       </div>
                     );
                   })}
 
-                  {/* มีรายการมากกว่าที่แสดง */}
-                  {totalCount > 2 && (
+                  {/* มีประเภทเคสมากกว่า 2 รายการ */}
+                  {caseTypes.length > 2 && (
                     <div
                       style={{
                         padding: '1px 4px',
                         fontSize: '0.563rem',
                         textAlign: 'center',
-                        color: 'var(--primary-dark)',
-                        backgroundColor: 'var(--accent)',
+                        color: caseTypes.slice(2).some((c) => !c.allDone) ? '#c2410c' : 'var(--primary-dark)',
+                        backgroundColor: caseTypes.slice(2).some((c) => !c.allDone) ? '#ffedd5' : 'var(--accent)',
+                        border: caseTypes.slice(2).some((c) => !c.allDone) ? '1px solid #fdba74' : 'none',
                         borderRadius: '3px',
                         fontWeight: 600,
-                        lineHeight: '1.1',
+                        lineHeight: '1.2',
                       }}
+                      title={`ยังมีอีก ${caseTypes.length - 2} ประเภท`}
                     >
-                      +{totalCount - 2} รายการ
+                      +{caseTypes.length - 2} อื่นๆ
                     </div>
                   )}
                 </div>
@@ -464,9 +493,9 @@ export default function CalendarPage() {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {dayCases.map((ev) => (
-                    <div
+                    <Link
                       key={ev.id}
-                      onClick={() => router.push(`/cases/${ev.id}`)}
+                      href={`/cases/${ev.id}`}
                       style={{
                         padding: '10px 12px',
                         borderRadius: 'var(--radius-sm)',
@@ -476,6 +505,8 @@ export default function CalendarPage() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
+                        textDecoration: 'none',
+                        color: 'inherit',
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -493,7 +524,8 @@ export default function CalendarPage() {
                           </div>
                         </div>
                       </div>
-                    </div>
+                      <ChevronRight size={16} style={{ color: 'var(--text-secondary)' }} />
+                    </Link>
                   ))}
                 </div>
               )}
@@ -540,9 +572,9 @@ export default function CalendarPage() {
         {combinedList.map((item) => {
           const ev = item.rawCase;
           return (
-            <div
+            <Link
               key={ev.id}
-              onClick={() => router.push(`/cases/${ev.id}`)}
+              href={`/cases/${ev.id}`}
               className="card"
               style={{
                 padding: '14px 18px',
@@ -553,6 +585,10 @@ export default function CalendarPage() {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 gap: '12px',
+                textDecoration: 'none',
+                color: 'inherit',
+                borderRadius: 'var(--radius-md)',
+                transition: 'all 0.15s ease',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -574,7 +610,8 @@ export default function CalendarPage() {
                   </div>
                 </div>
               </div>
-            </div>
+              <ChevronRight size={18} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+            </Link>
           );
         })}
       </div>
@@ -872,13 +909,10 @@ export default function CalendarPage() {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {dayCases.map((ev) => (
-                        <button
+                        <Link
                           key={ev.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedDay(null);
-                            router.push(`/cases/${ev.id}`);
-                          }}
+                          href={`/cases/${ev.id}`}
+                          onClick={() => setSelectedDay(null)}
                           className="card"
                           style={{
                             display: 'block',
@@ -888,6 +922,11 @@ export default function CalendarPage() {
                             textAlign: 'left',
                             fontFamily: 'inherit',
                             border: '1px solid var(--border)',
+                            textDecoration: 'none',
+                            color: 'inherit',
+                            borderRadius: 'var(--radius-md)',
+                            transition: 'all 0.15s ease',
+                            backgroundColor: 'var(--surface)',
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
@@ -900,13 +939,16 @@ export default function CalendarPage() {
                               {safeFormatDate(ev.actual_updated_at || ev.scheduled_at, 'HH:mm น.')}
                             </span>
                           </div>
-                          <div style={{ fontSize: '0.938rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                            {getLabel(ev)}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ fontSize: '0.938rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                              {getLabel(ev)}
+                            </div>
+                            <ChevronRight size={18} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
                           </div>
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '3px' }}>
                             นักเรียน {ev.student_count} คน
                           </div>
-                        </button>
+                        </Link>
                       ))}
                     </div>
                   </div>
