@@ -7,7 +7,6 @@ import {
   Calendar,
   Users,
   Database,
-  HeartHandshake,
   FileBarChart,
   Settings,
   LogOut,
@@ -43,12 +42,6 @@ export function Sidebar({ onItemClick }: SidebarProps) {
       icon: Database,
       isActive: pathname.startsWith('/admin'),
       adminOnly: true,
-    },
-    {
-      name: 'ผู้ปกครอง',
-      href: '/parents',
-      icon: HeartHandshake,
-      isActive: pathname.startsWith('/parents'),
     },
     {
       name: 'รายงาน',

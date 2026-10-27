@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Calendar, Users, HeartHandshake, FileBarChart, Settings } from 'lucide-react';
+import { Calendar, Users, FileBarChart, Settings } from 'lucide-react';
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -10,7 +10,6 @@ export function BottomNav() {
   const links = [
     { href: '/', label: 'ปฏิทิน', icon: Calendar, isActive: pathname === '/' || pathname.startsWith('/cases') },
     { href: '/students', label: 'นักเรียน', icon: Users, isActive: pathname.startsWith('/students') },
-    { href: '/parents', label: 'ผู้ปกครอง', icon: HeartHandshake, isActive: pathname.startsWith('/parents') },
     { href: '/reports', label: 'รายงาน', icon: FileBarChart, isActive: pathname.startsWith('/reports') },
     { href: '/profile', label: 'ตั้งค่า', icon: Settings, isActive: pathname.startsWith('/profile') || pathname.startsWith('/admin') },
   ];
