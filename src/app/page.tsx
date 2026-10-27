@@ -53,12 +53,14 @@ import { EventModal } from '@/components/EventModal';
 import { EventDetailModal } from '@/components/EventDetailModal';
 
 type ViewMode = 'month' | 'week' | 'list';
+type StatusFilter = 'all' | 'planned' | 'done';
 
 export default function CalendarPage() {
   const router = useRouter();
   const { currentUser, isAdmin } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [schoolEvents, setSchoolEvents] = useState<SchoolEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -145,8 +147,13 @@ export default function CalendarPage() {
 
   // Filter helpers
   const getCasesForDate = useCallback((date: Date) => {
-    return events.filter((e) => e.scheduled_at && isSameDay(safeParseDate(e.scheduled_at), date));
-  }, [events]);
+    return events.filter((e) => {
+      if (!e.scheduled_at || !isSameDay(safeParseDate(e.scheduled_at), date)) return false;
+      if (statusFilter === 'planned') return e.status === 'planned';
+      if (statusFilter === 'done') return e.status === 'done';
+      return true;
+    });
+  }, [events, statusFilter]);
 
   const getSchoolEventsForDate = useCallback((_date: Date) => {
     return [];
@@ -540,7 +547,13 @@ export default function CalendarPage() {
   // RENDER: List View
   // =============================================================
   const renderListView = () => {
-    const combinedList = events.map((e) => ({
+    const filteredEvents = events.filter((e) => {
+      if (statusFilter === 'planned') return e.status === 'planned';
+      if (statusFilter === 'done') return e.status === 'done';
+      return true;
+    });
+
+    const combinedList = filteredEvents.map((e) => ({
       type: 'case' as const,
       id: e.id,
       dateStr: e.scheduled_at,
@@ -643,7 +656,14 @@ export default function CalendarPage() {
         {/* Action Buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
-            onClick={() => exportMonthlyCasesToExcel(events, headerLabel)}
+            onClick={() => {
+              const exportList = events.filter((e) => {
+                if (statusFilter === 'planned') return e.status === 'planned';
+                if (statusFilter === 'done') return e.status === 'done';
+                return true;
+              });
+              exportMonthlyCasesToExcel(exportList, headerLabel);
+            }}
             className="btn-secondary"
             style={{ padding: '8px 14px', fontSize: '0.813rem', minHeight: '38px' }}
             title="ส่งออกเคสเดือนนี้เป็น Excel"
@@ -753,16 +773,77 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* Sub-controls: Checkbox แสดงเฉพาะเคสของฉัน (สำหรับ Admin) */}
-      {isAdmin && (
+      {/* Sub-controls: 3 ตัวเลือกสถานะเคส (ทั้งหมด, เคสที่ยังไม่เสร็จ, เคสที่เสร็จแล้ว) และ Checkbox แสดงเฉพาะเคสของฉัน */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px',
+          marginBottom: '16px',
+        }}
+      >
+        {/* ช่องเลือก 3 ช่อง ข้างล่าง วันนี้: ทั้งหมด | เคสที่ยังไม่เสร็จ | เคสที่เสร็จแล้ว */}
         <div
           style={{
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
-            justifyContent: 'flex-end',
-            marginBottom: '16px',
+            backgroundColor: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '3px',
+            gap: '3px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
           }}
         >
+          {[
+            { key: 'all' as const, label: 'ทั้งหมด' },
+            { key: 'planned' as const, label: 'เคสที่ยังไม่เสร็จ', dotColor: '#ea580c' },
+            { key: 'done' as const, label: 'เคสที่เสร็จแล้ว', dotColor: '#10b981' },
+          ].map((tab) => {
+            const isSelected = statusFilter === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setStatusFilter(tab.key)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '0.813rem',
+                  fontFamily: 'inherit',
+                  fontWeight: isSelected ? 600 : 500,
+                  cursor: 'pointer',
+                  backgroundColor: isSelected ? 'var(--accent)' : 'transparent',
+                  color: isSelected ? 'var(--primary-dark)' : 'var(--text-secondary)',
+                  boxShadow: isSelected ? '0 1px 3px rgba(159, 119, 180, 0.2)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {tab.dotColor && (
+                  <span
+                    style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      backgroundColor: tab.dotColor,
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Checkbox แสดงเฉพาะเคสของฉัน (สำหรับ Admin) */}
+        {isAdmin && (
           <label
             style={{
               display: 'inline-flex',
@@ -786,8 +867,8 @@ export default function CalendarPage() {
             />
             <span>แสดงเฉพาะเคสของฉัน</span>
           </label>
-        </div>
-      )}
+        )}
+      </div>
 
       {error && (
         <div
