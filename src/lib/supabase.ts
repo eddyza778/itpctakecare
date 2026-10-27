@@ -16,3 +16,19 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: false,
   },
 });
+
+// สร้าง Supabase client ที่แนบ Header 'x-caretaker-id' สำหรับ RLS
+export function getScopedSupabase(caretakerId?: string | null) {
+  if (!caretakerId) return supabase;
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+    global: {
+      headers: {
+        'x-caretaker-id': caretakerId,
+      },
+    },
+  });
+}

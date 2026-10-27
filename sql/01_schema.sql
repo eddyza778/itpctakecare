@@ -27,10 +27,14 @@ CREATE TABLE IF NOT EXISTS students (
   grade         text NULL,
   room          integer NULL,
   gender        text NULL,
+  academic_year text NOT NULL DEFAULT '2569', -- ปีการศึกษา เช่น 2568, 2569
   created_at    timestamptz NULL DEFAULT now(),
   updated_at    timestamptz NULL DEFAULT now(),
+  closed_at     timestamptz NULL,          -- ไม่ NULL = ปิด (ไม่ดึงมาแสดง)
   PRIMARY KEY (id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_students_academic_year ON students (academic_year);
 
 CREATE INDEX IF NOT EXISTS idx_students_student_id ON students (student_id);
 CREATE INDEX IF NOT EXISTS idx_students_grade_room ON students (grade, room);
@@ -42,6 +46,8 @@ CREATE TABLE IF NOT EXISTS caretakers (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name       text NOT NULL,
   pin_hash   text NOT NULL,            -- เก็บ hash ด้วย crypt()
+  role       text NOT NULL DEFAULT 'caretaker',  -- 'admin' | 'caretaker' (constraint อยู่ใน 06)
+  closed_at  timestamptz NULL,         -- ไม่ NULL = บัญชีถูกปิด
   created_at timestamptz DEFAULT now()
 );
 

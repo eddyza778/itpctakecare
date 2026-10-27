@@ -20,6 +20,13 @@ export function CreateCaseModal({ initialDate, onClose, onCreated }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  function getCurrentTimeString(): string {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
+
   // Form state
   const [selectedStudents, setSelectedStudents] = useState<Student[]>([]);
   const [studentSearch, setStudentSearch] = useState('');
@@ -29,7 +36,7 @@ export function CreateCaseModal({ initialDate, onClose, onCreated }: Props) {
   const [otherText, setOtherText] = useState('');
   const [details, setDetails] = useState('');
   const [scheduledDate, setScheduledDate] = useState(initialDate || '');
-  const [scheduledTime, setScheduledTime] = useState('09:00');
+  const [scheduledTime, setScheduledTime] = useState(() => getCurrentTimeString());
   const [selectedCaretakers, setSelectedCaretakers] = useState<Caretaker[]>([]);
 
   useEffect(() => {
@@ -42,20 +49,21 @@ export function CreateCaseModal({ initialDate, onClose, onCreated }: Props) {
           const me = c.find((ct) => ct.id === currentUser.id);
           if (me) setSelectedCaretakers([me]);
         }
-        // ตั้งวันเริ่มต้น
+        // ตั้งวันเริ่มต้นและเวลาตามจริง ณ ขณะเปิด
         if (initialDate) {
           setScheduledDate(initialDate);
         } else {
           const today = new Date();
           setScheduledDate(today.toISOString().split('T')[0]);
         }
+        setScheduledTime(getCurrentTimeString());
         setLoading(false);
       })
       .catch(() => {
         setError('ไม่สามารถโหลดข้อมูลได้');
         setLoading(false);
       });
-  }, [currentUser]);
+  }, [currentUser, initialDate]);
 
   const grades = [...new Set(students.map((s) => s.grade).filter(Boolean))].sort() as string[];
   const rooms = [...new Set(students.filter((s) => !gradeFilter || s.grade === gradeFilter).map((s) => s.room).filter((r) => r !== null))].sort() as number[];
@@ -265,7 +273,7 @@ export function CreateCaseModal({ initialDate, onClose, onCreated }: Props) {
                           {s.nickname_th && <span style={{ color: '#9e9690' }}> ({s.nickname_th})</span>}
                         </div>
                         <span style={{ fontSize: '0.75rem', color: '#9e9690' }}>
-                          {s.grade}/{s.room}
+                          {s.grade}/{s.room}{s.academic_year ? ` (ปี ${s.academic_year})` : ''}
                         </span>
                       </button>
                     );

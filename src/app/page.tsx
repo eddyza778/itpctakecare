@@ -1,18 +1,23 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ChevronLeft,
   ChevronRight,
   Plus,
   CalendarDays,
-  Calendar,
+  Calendar as CalendarIcon,
   List,
   LayoutGrid,
   FileSpreadsheet,
   X,
   Clock,
+  Sparkles,
+  MapPin,
+  CheckCircle2,
+  Tag,
+  GraduationCap,
 } from 'lucide-react';
 import {
   format,
@@ -28,7 +33,6 @@ import {
   isSameMonth,
   isSameDay,
   isToday,
-  parseISO,
 } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { safeFormatDate, safeParseDate } from '@/lib/date';
@@ -38,23 +42,47 @@ import type { CalendarEvent } from '@/lib/types';
 import { CASE_TYPE_LABELS } from '@/lib/types';
 import { CreateCaseModal } from '@/components/CreateCaseModal';
 import { exportMonthlyCasesToExcel } from '@/lib/excel';
+import {
+  SchoolEvent,
+  EVENT_CATEGORY_CONFIG,
+  getStoredSchoolEvents,
+  saveStoredSchoolEvents,
+} from '@/lib/schoolEvents';
+import { EventModal } from '@/components/EventModal';
+import { EventDetailModal } from '@/components/EventDetailModal';
 
 type ViewMode = 'month' | 'week' | 'list';
 
 export default function CalendarPage() {
   const router = useRouter();
-  const { currentUser } = useAuth();
+  const { currentUser, isAdmin } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [schoolEvents, setSchoolEvents] = useState<SchoolEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showMyOnly, setShowMyOnly] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createModalDate, setCreateModalDate] = useState<string | undefined>(undefined);
+  const [showMyOnly, setShowMyOnly] = useState(false);
+
+  // Modals state
+  const [showCreateCaseModal, setShowCreateCaseModal] = useState(false);
+  const [createCaseDate, setCreateCaseDate] = useState<string | undefined>(undefined);
+
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [editingSchoolEvent, setEditingSchoolEvent] = useState<SchoolEvent | null>(null);
+  const [eventModalDate, setEventModalDate] = useState<string | undefined>(undefined);
+
+  const [viewingSchoolEvent, setViewingSchoolEvent] = useState<SchoolEvent | null>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [showFabMenu, setShowFabMenu] = useState(false);
+
+  // Load school events from local storage (demo isolated)
+  useEffect(() => {
+    setSchoolEvents(getStoredSchoolEvents());
+  }, []);
 
   const fetchEvents = useCallback(async () => {
+    if (!currentUser) return;
     setLoading(true);
     setError('');
     try {
@@ -62,38 +90,45 @@ export default function CalendarPage() {
       if (viewMode === 'month') {
         const monthStart = startOfMonth(currentDate);
         const monthEnd = endOfMonth(currentDate);
-        start = startOfWeek(monthStart, { weekStartsOn: 0 });
-        end = endOfWeek(monthEnd, { weekStartsOn: 0 });
+        start = startOfWeek(monthStart, { weekStartsOn: 1 }); // วันจันทร์ถึงวันอาทิตย์
+        end = endOfWeek(monthEnd, { weekStartsOn: 1 });
       } else if (viewMode === 'week') {
-        start = startOfWeek(currentDate, { weekStartsOn: 0 });
-        end = endOfWeek(currentDate, { weekStartsOn: 0 });
+        start = startOfWeek(currentDate, { weekStartsOn: 1 });
+        end = endOfWeek(currentDate, { weekStartsOn: 1 });
       } else {
-        // list: ดึงทั้งเดือน
         start = startOfMonth(currentDate);
         end = endOfMonth(currentDate);
       }
 
+      const filterId = isAdmin ? (showMyOnly ? currentUser.id : undefined) : currentUser.id;
+
       const data = await getCalendarEvents(
         start.toISOString(),
         end.toISOString(),
-        showMyOnly ? currentUser?.id : undefined
+        filterId,
+        currentUser.id
       );
       setEvents(data);
+      setError('');
     } catch (err: unknown) {
       const e = err as { message?: string; code?: string; hint?: string };
-      const msg = e?.message
-        ? `ฐานข้อมูลแจ้งเตือน (${e.code || ''}): ${e.message}`
-        : 'ไม่สามารถโหลดข้อมูลปฏิทินได้';
-      setError(msg);
-      console.error('fetchEvents error:', e?.message || err, e?.hint || '');
+      const rawMsg = e?.message || String(err);
+      if (rawMsg.includes('unexpected response') || rawMsg.includes('abort') || rawMsg.includes('Failed to fetch')) {
+        console.warn('fetchEvents transient notice:', rawMsg);
+        return;
+      }
+      setError('ไม่สามารถโหลดข้อมูลปฏิทินได้');
+      console.error('fetchEvents error:', rawMsg, e?.hint || '');
     } finally {
       setLoading(false);
     }
-  }, [currentDate, viewMode, showMyOnly, currentUser]);
+  }, [currentDate, viewMode, showMyOnly, currentUser, isAdmin]);
 
   useEffect(() => {
-    fetchEvents();
-  }, [fetchEvents]);
+    if (currentUser) {
+      fetchEvents();
+    }
+  }, [fetchEvents, currentUser]);
 
   const navigate = (dir: 'prev' | 'next') => {
     if (viewMode === 'month') {
@@ -107,55 +142,112 @@ export default function CalendarPage() {
 
   const goToday = () => setCurrentDate(new Date());
 
-  const getEventsForDate = (date: Date) =>
-    events.filter((e) => e.scheduled_at && isSameDay(safeParseDate(e.scheduled_at), date));
+  // Filter helpers
+  const getCasesForDate = useCallback((date: Date) => {
+    return events.filter((e) => e.scheduled_at && isSameDay(safeParseDate(e.scheduled_at), date));
+  }, [events]);
+
+  const getSchoolEventsForDate = useCallback((_date: Date) => {
+    return [];
+  }, []);
 
   const getLabel = (e: CalendarEvent) =>
     e.case_type === 'other' ? e.other_text || 'อื่นๆ' : CASE_TYPE_LABELS[e.case_type];
 
-  // ======= RENDER =======
+  // School events CRUD handlers
+  const handleSaveSchoolEvent = (savedEvent: SchoolEvent) => {
+    const existingIndex = schoolEvents.findIndex((ev) => ev.id === savedEvent.id);
+    let updated: SchoolEvent[];
+    if (existingIndex >= 0) {
+      updated = [...schoolEvents];
+      updated[existingIndex] = savedEvent;
+    } else {
+      updated = [savedEvent, ...schoolEvents];
+    }
+    setSchoolEvents(updated);
+    saveStoredSchoolEvents(updated);
+    setShowEventModal(false);
+    setEditingSchoolEvent(null);
+  };
 
+  const handleDeleteSchoolEvent = (id: string) => {
+    const updated = schoolEvents.filter((ev) => ev.id !== id);
+    setSchoolEvents(updated);
+    saveStoredSchoolEvents(updated);
+    setShowEventModal(false);
+    setEditingSchoolEvent(null);
+    setViewingSchoolEvent(null);
+  };
+
+  // Thai Date formatting with Buddhist Year (พ.ศ.)
+  const buddhistYear = currentDate.getFullYear() + 543;
+  const monthNameThai = format(currentDate, 'MMMM', { locale: th });
+  const headerLabel = viewMode === 'week'
+    ? `${format(startOfWeek(currentDate, { weekStartsOn: 1 }), 'd')}–${format(endOfWeek(currentDate, { weekStartsOn: 1 }), 'd MMMM', { locale: th })} ${buddhistYear}`
+    : `${monthNameThai} ${buddhistYear}`;
+
+  // =============================================================
+  // RENDER: Month View (วันจันทร์ – วันอาทิตย์)
+  // =============================================================
   const renderMonthView = () => {
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(currentDate);
-    const calStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-    const calEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+    const calStart = startOfWeek(monthStart, { weekStartsOn: 1 }); // วันจันทร์ถึงอาทิตย์
+    const calEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
     const days = eachDayOfInterval({ start: calStart, end: calEnd });
 
-    const weekDays = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+    const weekDays = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
 
     return (
       <div style={{ padding: 0, width: '100%', overflow: 'hidden' }}>
-        {/* วันในสัปดาห์ */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '2px', marginBottom: '4px', width: '100%' }}>
-          {weekDays.map((d) => (
-            <div key={d} style={{ textAlign: 'center', fontSize: '0.75rem', color: '#9e9690', padding: '6px 0', fontWeight: 500, minWidth: 0 }}>
-              {d}
-            </div>
-          ))}
+        {/* Header แถววันในสัปดาห์ (จันทร์ - อาทิตย์) */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+            gap: '4px',
+            marginBottom: '6px',
+            width: '100%',
+          }}
+        >
+          {weekDays.map((d, index) => {
+            const isWeekend = index >= 5;
+            return (
+              <div
+                key={d}
+                style={{
+                  textAlign: 'center',
+                  fontSize: '0.781rem',
+                  color: isWeekend ? 'var(--primary)' : 'var(--text-secondary)',
+                  padding: '8px 0',
+                  fontWeight: 600,
+                  minWidth: 0,
+                  background: isWeekend ? 'var(--accent)' : 'var(--surface)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                {d}
+              </div>
+            );
+          })}
         </div>
 
-        {/* ตารางวัน */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '2px', width: '100%' }}>
+        {/* ตารางวันปฏิทิน */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+            gap: '4px',
+            width: '100%',
+          }}
+        >
           {days.map((day) => {
-            const dayEvents = getEventsForDate(day);
+            const dayCases = getCasesForDate(day);
+            const daySchoolEvents = getSchoolEventsForDate(day);
             const inMonth = isSameMonth(day, currentDate);
             const today = isToday(day);
-
-            // รวมประเภทเคสในวันนี้: แสดงแค่ประเภทเคส และหากประเภทไหนยังไม่เสร็จสิ้นจะแสดงสีส้ม
-            const typeMap = new Map<string, { label: string; allDone: boolean; count: number }>();
-            for (const ev of dayEvents) {
-              const label = getLabel(ev);
-              const isEvDone = ev.status === 'done';
-              const existing = typeMap.get(label);
-              if (!existing) {
-                typeMap.set(label, { label, allDone: isEvDone, count: 1 });
-              } else {
-                existing.count += 1;
-                if (!isEvDone) existing.allDone = false;
-              }
-            }
-            const caseTypes = Array.from(typeMap.values());
+            const totalCount = dayCases.length;
 
             return (
               <div
@@ -163,131 +255,127 @@ export default function CalendarPage() {
                 onClick={() => setSelectedDay(day)}
                 role="button"
                 tabIndex={0}
-                title={`ดูเคสวันที่ ${format(day, 'd MMMM yyyy', { locale: th })} (${dayEvents.length} เคส)`}
                 className="cal-day-cell"
                 style={{
-                  padding: '2px',
-                  borderRadius: 'var(--radius-sm)',
-                  background: today ? 'var(--lavender)' : inMonth ? 'var(--card-bg)' : 'transparent',
-                  border: today ? '1.5px solid var(--primary-light)' : '1px solid var(--border-light)',
-                  opacity: inMonth ? 1 : 0.4,
+                  padding: '4px 5px',
+                  borderRadius: 'var(--radius-md)',
+                  background: today ? '#FAF5FF' : inMonth ? 'var(--surface)' : '#FAFAFC',
+                  border: today
+                    ? '2px solid var(--primary)'
+                    : '1px solid var(--border)',
+                  opacity: inMonth ? 1 : 0.45,
                   cursor: 'pointer',
-                  transition: 'background-color 0.15s, border-color 0.15s',
+                  transition: 'all 0.16s ease',
                   display: 'flex',
                   flexDirection: 'column',
-                  minWidth: 0,
-                  width: '100%',
-                  overflow: 'hidden',
-                  boxSizing: 'border-box',
+                  boxShadow: today ? '0 2px 8px rgba(159, 119, 180, 0.2)' : 'none',
                 }}
               >
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  fontSize: '0.75rem',
-                  fontWeight: today ? 600 : 400,
-                  color: today ? 'var(--primary-dark)' : 'var(--foreground)',
-                  marginBottom: '2px',
-                  minWidth: 0,
-                  padding: '0 2px',
-                }}>
-                  <span>{format(day, 'd')}</span>
-                  {dayEvents.length > 0 && (
+                {/* วันที่และจำนวนรวม */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontSize: '0.813rem',
+                    fontWeight: today ? 700 : 500,
+                    color: today ? 'var(--primary-dark)' : inMonth ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    marginBottom: '4px',
+                    padding: '0 2px',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: today ? '24px' : 'auto',
+                      height: today ? '24px' : 'auto',
+                      borderRadius: today ? '50%' : 'none',
+                      background: today ? 'var(--primary)' : 'transparent',
+                      color: today ? '#ffffff' : 'inherit',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: today ? '0.75rem' : 'inherit',
+                    }}
+                  >
+                    {format(day, 'd')}
+                  </span>
+
+                  {totalCount > 0 && (
                     <span
                       style={{
                         fontSize: '0.625rem',
-                        background: today ? 'var(--primary)' : '#ede4f3',
-                        color: today ? '#fff' : 'var(--primary-dark)',
-                        padding: '0 3px',
+                        background: today ? 'var(--primary-dark)' : 'var(--accent)',
+                        color: today ? '#ffffff' : 'var(--primary-dark)',
+                        padding: '1px 5px',
                         borderRadius: '10px',
                         fontWeight: 600,
-                        lineHeight: '13px',
-                        flexShrink: 0,
                       }}
                     >
-                      {dayEvents.length}
+                      {totalCount}
                     </span>
                   )}
                 </div>
 
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, width: '100%', overflow: 'hidden' }}>
-                  {caseTypes.slice(0, 2).map((ct) => {
-                    const isOrange = !ct.allDone; // ถ้ามีเคสที่ยังไม่เสร็จ -> สีส้ม
+                {/* Badges / Items ในช่องวัน (เคสดูแลนักเรียน) */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '3px', overflow: 'hidden' }}>
+                  {dayCases.slice(0, 3).map((cev) => {
+                    const isDone = cev.status === 'done';
                     return (
                       <div
-                        key={ct.label}
+                        key={cev.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/cases/${cev.id}`);
+                        }}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '2px',
-                          width: '100%',
-                          minWidth: 0,
-                          padding: '1px 3px',
-                          borderRadius: '3px',
-                          fontSize: '0.5625rem',
-                          lineHeight: '1.2',
-                          fontFamily: 'inherit',
+                          gap: '3px',
+                          padding: '2px 4px',
+                          borderRadius: '4px',
+                          fontSize: '0.625rem',
+                          lineHeight: '1.25',
                           fontWeight: 500,
-                          backgroundColor: isOrange ? '#ffedd5' : '#d4f0e7',
-                          color: isOrange ? '#c2410c' : '#2e6b52',
-                          border: isOrange ? '1px solid #fdba74' : '1px solid #a7f3d0',
+                          backgroundColor: isDone ? '#e8f7f0' : '#fef7e6',
+                          color: isDone ? '#276749' : '#c05621',
+                          border: isDone ? '1px solid #a7e4cb' : '1px solid #fbd38d',
                           overflow: 'hidden',
-                          boxSizing: 'border-box',
+                          whiteSpace: 'nowrap',
+                          textOverflow: 'ellipsis',
                         }}
-                        title={`${ct.label} (${ct.count} เคส, ${ct.allDone ? 'เสร็จสิ้นทั้งหมด' : 'ยังไม่เสร็จสิ้น'})`}
+                        title={`เคส: ${getLabel(cev)} (${cev.student_count} คน)`}
                       >
                         <span
                           style={{
-                            width: '4px',
-                            height: '4px',
+                            width: '5px',
+                            height: '5px',
                             borderRadius: '50%',
-                            backgroundColor: isOrange ? '#ea580c' : '#10b981',
+                            backgroundColor: isDone ? '#38a169' : '#dd6b20',
                             flexShrink: 0,
                           }}
                         />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
-                          {ct.label}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {getLabel(cev)}
                         </span>
-                        {ct.count > 1 && (
-                          <span
-                            style={{
-                              fontSize: '0.5625rem',
-                              fontWeight: 700,
-                              padding: '0 2px',
-                              borderRadius: '2px',
-                              backgroundColor: isOrange ? '#fed7aa' : '#bbf0dd',
-                              color: isOrange ? '#9a3412' : '#1d5440',
-                              flexShrink: 0,
-                              lineHeight: '11px',
-                            }}
-                          >
-                            +{ct.count}
-                          </span>
-                        )}
                       </div>
                     );
                   })}
-                  {caseTypes.length > 2 && (
+
+                  {/* มีรายการมากกว่าที่แสดง */}
+                  {totalCount > 2 && (
                     <div
                       style={{
-                        padding: '1px 2px',
-                        fontSize: '0.5rem',
+                        padding: '1px 4px',
+                        fontSize: '0.563rem',
                         textAlign: 'center',
-                        color: caseTypes.slice(2).some((c) => !c.allDone) ? '#c2410c' : '#8a8280',
-                        backgroundColor: caseTypes.slice(2).some((c) => !c.allDone) ? '#ffedd5' : 'var(--lavender)',
-                        border: caseTypes.slice(2).some((c) => !c.allDone) ? '1px solid #fdba74' : 'none',
-                        borderRadius: '2px',
+                        color: 'var(--primary-dark)',
+                        backgroundColor: 'var(--accent)',
+                        borderRadius: '3px',
                         fontWeight: 600,
                         lineHeight: '1.1',
-                        overflow: 'hidden',
-                        whiteSpace: 'nowrap',
-                        textOverflow: 'ellipsis',
-                        minWidth: 0,
                       }}
-                      title={`ยังมีอีก ${caseTypes.length - 2} ประเภท`}
                     >
-                      +{caseTypes.length - 2}
+                      +{totalCount - 2} รายการ
                     </div>
                   )}
                 </div>
@@ -299,100 +387,191 @@ export default function CalendarPage() {
     );
   };
 
+  // =============================================================
+  // RENDER: Week View
+  // =============================================================
   const renderWeekView = () => {
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
     const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
     return (
-      <div style={{ padding: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {days.map((day) => {
-          const dayEvents = getEventsForDate(day);
+          const dayCases = getCasesForDate(day);
+          const daySchoolEvents = getSchoolEventsForDate(day);
           const today = isToday(day);
 
           return (
             <div
               key={day.toISOString()}
+              className="card"
               style={{
+                padding: '16px 18px',
+                background: today ? '#FAF5FF' : 'var(--surface)',
+                border: today ? '1.5px solid var(--primary)' : '1px solid var(--border)',
                 display: 'flex',
+                flexDirection: 'column',
                 gap: '12px',
-                padding: '12px 0',
-                borderBottom: '1px solid var(--border-light)',
               }}
             >
-              <button
-                type="button"
-                onClick={() => setSelectedDay(day)}
-                style={{
-                  width: '44px',
-                  textAlign: 'center',
-                  flexShrink: 0,
-                  border: 'none',
-                  background: 'none',
-                  cursor: 'pointer',
-                  padding: 0,
-                  fontFamily: 'inherit',
-                }}
-                title={`ดูเคสวันที่ ${format(day, 'd MMMM yyyy', { locale: th })}`}
-              >
-                <div style={{ fontSize: '0.75rem', color: '#9e9690' }}>
-                  {format(day, 'EEE', { locale: th })}
-                </div>
-                <div style={{
-                  fontSize: '1.125rem',
-                  fontWeight: today ? 700 : 400,
-                  color: today ? 'var(--primary)' : 'var(--foreground)',
-                  width: '32px',
-                  height: '32px',
-                  lineHeight: '32px',
-                  borderRadius: '50%',
-                  background: today ? 'var(--lavender)' : 'transparent',
-                  margin: '0 auto',
-                  transition: 'transform 0.1s',
-                }}>
-                  {format(day, 'd')}
-                </div>
-              </button>
-
-              <div style={{ flex: 1, minWidth: 0 }}>
-                {dayEvents.length === 0 && (
-                  <div style={{ fontSize: '0.8125rem', color: '#c5bcb6', padding: '8px 0' }}>
-                    ไม่มีเคส
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div
+                    style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '10px',
+                      background: today ? 'var(--primary)' : 'var(--accent)',
+                      color: today ? '#ffffff' : 'var(--primary-dark)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                      lineHeight: 1.1,
+                    }}
+                  >
+                    <span style={{ fontSize: '0.625rem', textTransform: 'uppercase' }}>
+                      {format(day, 'EEE', { locale: th })}
+                    </span>
+                    <span style={{ fontSize: '1rem' }}>{format(day, 'd')}</span>
                   </div>
-                )}
-                <div className="cases-grid">
-                  {dayEvents.map((ev) => (
-                    <button
+                  <div>
+                    <div style={{ fontSize: '0.938rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {format(day, 'EEEEที่ d MMMM yyyy', { locale: th })}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      {dayCases.length} เคสการดูแล
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setSelectedDay(day)}
+                  className="btn-secondary"
+                  style={{ padding: '6px 12px', minHeight: '32px', fontSize: '0.75rem' }}
+                >
+                  เปิดดูวันนี้
+                </button>
+              </div>
+
+              {/* Items list */}
+              {dayCases.length === 0 ? (
+                <div style={{ fontSize: '0.813rem', color: 'var(--text-secondary)', padding: '6px 0' }}>
+                  ไม่มีเคสดูแลนักเรียนในวันนี้
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {dayCases.map((ev) => (
+                    <div
                       key={ev.id}
                       onClick={() => router.push(`/cases/${ev.id}`)}
-                      className="card"
                       style={{
-                        display: 'block',
-                        width: '100%',
                         padding: '10px 12px',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        fontFamily: 'inherit',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: 'var(--surface)',
                         border: '1px solid var(--border)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span className={`status-badge status-${ev.status}`}>
                           <span className="status-dot" />
                           {ev.status === 'planned' ? 'วางแผน' : 'เสร็จสิ้น'}
                         </span>
-                        <span style={{ fontSize: '0.75rem', color: '#9e9690' }}>
-                          {safeFormatDate(ev.scheduled_at, 'HH:mm น.')}
-                        </span>
+                        <div>
+                          <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {getLabel(ev)}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                            นักเรียน {ev.student_count} คน • อัปเดตจริง:{' '}
+                            {safeFormatDate(ev.actual_updated_at || ev.scheduled_at, 'HH:mm น.')}
+                          </div>
+                        </div>
                       </div>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>
-                        {getLabel(ev)}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: '#9e9690' }}>
-                        {ev.student_count} คน
-                      </div>
-                    </button>
+                    </div>
                   ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // =============================================================
+  // RENDER: List View
+  // =============================================================
+  const renderListView = () => {
+    const combinedList = events.map((e) => ({
+      type: 'case' as const,
+      id: e.id,
+      dateStr: e.scheduled_at,
+      actualTime: e.actual_updated_at || e.scheduled_at,
+      title: getLabel(e),
+      status: e.status,
+      subtitle: `นักเรียน ${e.student_count} คน`,
+      rawCase: e,
+    }));
+
+    combinedList.sort((a, b) => new Date(b.actualTime).getTime() - new Date(a.actualTime).getTime());
+
+    if (combinedList.length === 0) {
+      return (
+        <div className="card" style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+          <CalendarDays size={42} strokeWidth={1.5} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
+          <p style={{ margin: '0 0 6px', fontWeight: 600, color: 'var(--text-primary)' }}>
+            ไม่มีกิจกรรมหรือเคสในรายการ
+          </p>
+          <p style={{ margin: 0, fontSize: '0.813rem' }}>
+            ลองเปลี่ยนเดือน หรือคลิกปุ่ม &quot;+ เพิ่มกิจกรรม&quot; ด้านล่างเพื่อเพิ่มข้อมูลใหม่
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {combinedList.map((item) => {
+          const ev = item.rawCase;
+          return (
+            <div
+              key={ev.id}
+              onClick={() => router.push(`/cases/${ev.id}`)}
+              className="card"
+              style={{
+                padding: '14px 18px',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span className={`status-badge status-${ev.status}`}>
+                  <span className="status-dot" />
+                  {ev.status === 'planned' ? 'วางแผน' : 'เสร็จสิ้น'}
+                </span>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      {safeFormatDate(ev.actual_updated_at || ev.scheduled_at, 'd MMM yyyy HH:mm น.')}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.938rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {getLabel(ev)}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    นักเรียน {ev.student_count} คน
+                  </div>
                 </div>
               </div>
             </div>
@@ -402,182 +581,199 @@ export default function CalendarPage() {
     );
   };
 
-  const renderListView = () => {
-    const sorted = [...events].sort(
-      (a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()
-    );
-
-    if (sorted.length === 0) {
-      return (
-        <div className="empty-state">
-          <CalendarDays size={40} strokeWidth={1.5} />
-          <p>ไม่มีเคสในเดือนนี้</p>
-        </div>
-      );
-    }
-
-    return (
-      <div style={{ padding: 0 }}>
-        <div className="cases-grid">
-          {sorted.map((ev) => (
-            <button
-              key={ev.id}
-              onClick={() => router.push(`/cases/${ev.id}`)}
-              className="card"
-              style={{
-                display: 'block',
-                width: '100%',
-                padding: '14px 16px',
-                cursor: 'pointer',
-                textAlign: 'left',
-                fontFamily: 'inherit',
-                border: '1px solid var(--border)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <span className={`status-badge status-${ev.status}`}>
-                  <span className="status-dot" />
-                  {ev.status === 'planned' ? 'วางแผน' : 'เสร็จสิ้น'}
-                </span>
-                <span style={{ fontSize: '0.75rem', color: '#9e9690' }}>
-                  {safeFormatDate(ev.scheduled_at, 'd MMM yyyy HH:mm น.')}
-                </span>
-              </div>
-              <div style={{ fontSize: '0.9375rem', fontWeight: 500 }}>
-                {getLabel(ev)}
-              </div>
-              <div style={{ fontSize: '0.8125rem', color: '#9e9690' }}>
-                นักเรียน {ev.student_count} คน
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const headerLabel = viewMode === 'week'
-    ? `${format(startOfWeek(currentDate, { weekStartsOn: 0 }), 'd')}–${format(endOfWeek(currentDate, { weekStartsOn: 0 }), 'd MMM yyyy', { locale: th })}`
-    : format(currentDate, 'MMMM yyyy', { locale: th });
-
   return (
-    <div className="page-container" style={{ paddingBottom: '32px' }}>
-      {/* Header */}
-      <div style={{
-        padding: '16px 0 0',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '8px',
-      }}>
-        <h1 style={{ fontSize: '1.125rem', fontWeight: 600, margin: 0, color: 'var(--primary-dark)' }}>ปฏิทินเคส</h1>
+    <div className="page-container page-container-fluid" style={{ maxWidth: '100%', width: '100%', padding: '24px 28px 48px', boxSizing: 'border-box' }}>
+      {/* 1. Header Page Title & Top Actions */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px',
+          marginBottom: '18px',
+        }}
+      >
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <CalendarIcon size={24} color="var(--primary)" />
+            <h1 style={{ fontSize: '1.375rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+              ปฏิทินโรงเรียน
+            </h1>
+          </div>
+          <p style={{ margin: '4px 0 0', fontSize: '0.813rem', color: 'var(--text-secondary)' }}>
+            โรงเรียนสาธิตมหาวิทยาลัยเชียงใหม่ ระดับอนุบาลและประถมศึกษา
+          </p>
+        </div>
+
+        {/* Action Buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             onClick={() => exportMonthlyCasesToExcel(events, headerLabel)}
             className="btn-secondary"
-            style={{ padding: '6px 10px', fontSize: '0.75rem', minHeight: '34px', gap: '4px' }}
+            style={{ padding: '8px 14px', fontSize: '0.813rem', minHeight: '38px' }}
             title="ส่งออกเคสเดือนนี้เป็น Excel"
           >
-            <FileSpreadsheet size={15} />
+            <FileSpreadsheet size={16} />
             ส่งออก Excel
           </button>
-          <span style={{ fontSize: '0.8125rem', color: '#9e9690' }}>{currentUser?.name}</span>
         </div>
       </div>
 
-      {/* Controls */}
-      <div style={{
-        padding: '12px 0',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: '8px',
-        flexWrap: 'wrap',
-      }}>
-        {/* Navigation */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <button onClick={() => navigate('prev')} className="btn-secondary" style={{ padding: '8px', minHeight: '36px' }}>
+      {/* 2. Controls Bar (Month Switcher, Views, Filter Tabs) */}
+      <div
+        className="card"
+        style={{
+          padding: '14px 16px',
+          marginBottom: '18px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px',
+          background: 'var(--surface)',
+        }}
+      >
+        {/* Navigation Arrows & Today */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={() => navigate('prev')}
+            className="btn-secondary"
+            style={{ padding: '8px', minHeight: '36px', width: '36px' }}
+            title="เดือนก่อนหน้า"
+          >
             <ChevronLeft size={18} />
           </button>
-          <button onClick={goToday} className="btn-secondary" style={{ padding: '8px 12px', minHeight: '36px', fontSize: '0.8125rem' }}>
+          <button
+            onClick={goToday}
+            className="btn-secondary"
+            style={{ padding: '6px 14px', minHeight: '36px', fontSize: '0.813rem', fontWeight: 600 }}
+          >
             วันนี้
           </button>
-          <button onClick={() => navigate('next')} className="btn-secondary" style={{ padding: '8px', minHeight: '36px' }}>
+          <button
+            onClick={() => navigate('next')}
+            className="btn-secondary"
+            style={{ padding: '8px', minHeight: '36px', width: '36px' }}
+            title="เดือนถัดไป"
+          >
             <ChevronRight size={18} />
           </button>
+
+          <h2
+            style={{
+              fontSize: '1.063rem',
+              fontWeight: 700,
+              color: 'var(--primary-dark)',
+              margin: '0 0 0 8px',
+            }}
+          >
+            {headerLabel}
+          </h2>
         </div>
 
-        {/* View mode */}
-        <div style={{ display: 'flex', gap: '2px', background: 'var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '2px' }}>
-          {[
-            { mode: 'month' as ViewMode, icon: <LayoutGrid size={16} />, label: 'เดือน' },
-            { mode: 'week' as ViewMode, icon: <CalendarDays size={16} />, label: 'สัปดาห์' },
-            { mode: 'list' as ViewMode, icon: <List size={16} />, label: 'รายการ' },
-          ].map(({ mode, icon, label }) => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '6px 10px',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '0.75rem',
-                fontFamily: 'inherit',
-                cursor: 'pointer',
-                background: viewMode === mode ? 'var(--card-bg)' : 'transparent',
-                color: viewMode === mode ? 'var(--primary)' : '#9e9690',
-                fontWeight: viewMode === mode ? 500 : 400,
-                boxShadow: viewMode === mode ? 'var(--shadow-sm)' : 'none',
-              }}
-            >
-              {icon}
-              {label}
-            </button>
-          ))}
+        {/* View Mode Switcher (Month, Week, List) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div
+            style={{
+              display: 'flex',
+              background: 'var(--border-light)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '3px',
+              border: '1px solid var(--border)',
+            }}
+          >
+            {[
+              { mode: 'month' as ViewMode, icon: <LayoutGrid size={15} />, label: 'เดือน' },
+              { mode: 'week' as ViewMode, icon: <CalendarDays size={15} />, label: 'สัปดาห์' },
+              { mode: 'list' as ViewMode, icon: <List size={15} />, label: 'รายการ' },
+            ].map(({ mode, icon, label }) => {
+              const isActive = viewMode === mode;
+              return (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '6px 12px',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.781rem',
+                    fontFamily: 'inherit',
+                    cursor: 'pointer',
+                    background: isActive ? 'var(--surface)' : 'transparent',
+                    color: isActive ? 'var(--primary-dark)' : 'var(--text-secondary)',
+                    fontWeight: isActive ? 600 : 500,
+                    boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {icon}
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      {/* Month label + filter */}
-      <div style={{
-        padding: '0 0 12px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}>
-        <h2 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, textTransform: 'capitalize' }}>
-          {headerLabel}
-        </h2>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', color: '#9e9690', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={showMyOnly}
-            onChange={(e) => setShowMyOnly(e.target.checked)}
-            style={{ accentColor: 'var(--primary)', width: '16px', height: '16px' }}
-          />
-          เฉพาะเคสของฉัน
-        </label>
-      </div>
-
-      {error && (
-        <div style={{
-          margin: '0 0 12px',
-          padding: '10px 14px',
-          background: 'var(--rose)',
-          color: 'var(--rose-text)',
-          borderRadius: 'var(--radius-sm)',
-          fontSize: '0.8125rem',
-        }}>
-          {error} (กรุณารันคำสั่ง GRANT สิทธิ์ตารางให้ role anon บน Supabase SQL Editor)
+      {/* Sub-controls: Checkbox แสดงเฉพาะเคสของฉัน (สำหรับ Admin) */}
+      {isAdmin && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            marginBottom: '16px',
+          }}
+        >
+          <label
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '0.813rem',
+              color: 'var(--text-primary)',
+              fontWeight: 500,
+              cursor: 'pointer',
+              background: 'var(--surface)',
+              padding: '6px 14px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={showMyOnly}
+              onChange={(e) => setShowMyOnly(e.target.checked)}
+              style={{ accentColor: 'var(--primary)', width: '16px', height: '16px' }}
+            />
+            <span>แสดงเฉพาะเคสของฉัน</span>
+          </label>
         </div>
       )}
 
-      {/* Content */}
+      {error && (
+        <div
+          style={{
+            margin: '0 0 16px',
+            padding: '12px 16px',
+            background: 'var(--event-holiday-bg)',
+            color: 'var(--event-holiday-text)',
+            borderRadius: 'var(--radius-sm)',
+            fontSize: '0.813rem',
+            border: '1px solid var(--event-holiday-border)',
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {/* 4. Calendar Content */}
       {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
           <div className="spinner" />
         </div>
       ) : (
@@ -588,25 +784,27 @@ export default function CalendarPage() {
         </>
       )}
 
-      {/* FAB */}
+      {/* 5. Floating Action Button (FAB) สีม่วง #9f77b4 */}
       <button
         className="fab"
         onClick={() => {
-          setCreateModalDate(undefined);
-          setShowCreateModal(true);
+          setCreateCaseDate(undefined);
+          setShowCreateCaseModal(true);
         }}
-        aria-label="สร้างเคสใหม่"
+        aria-label="เปิดเคสดูแลนักเรียนใหม่"
+        title="เปิดเคสดูแลนักเรียนใหม่"
       >
-        <Plus size={26} strokeWidth={2} />
+        <Plus size={26} strokeWidth={2.2} />
       </button>
 
-      {/* Day Cases Modal — ดูเคสประจำวัน */}
+      {/* 6. Day Cases & Events Modal — ดูรายละเอียดกิจกรรมประจำวัน */}
       {selectedDay && (
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setSelectedDay(null)}>
-          <div
-            className="modal-content"
-            style={{ maxWidth: '480px', padding: '24px' }}
-          >
+        <div
+          className="modal-overlay"
+          onClick={(e) => e.target === e.currentTarget && setSelectedDay(null)}
+          style={{ zIndex: 55 }}
+        >
+          <div className="modal-content" style={{ maxWidth: '520px', padding: '24px' }}>
             {/* Header */}
             <div
               style={{
@@ -615,107 +813,108 @@ export default function CalendarPage() {
                 alignItems: 'flex-start',
                 marginBottom: '16px',
                 paddingBottom: '12px',
-                borderBottom: '1px solid var(--border-light)',
+                borderBottom: '1px solid var(--border)',
               }}
             >
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--primary)', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '2px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--primary)', fontSize: '0.813rem', fontWeight: 600, marginBottom: '2px' }}>
                   <CalendarDays size={16} />
-                  <span>เคสประจำวัน</span>
+                  <span>กิจกรรมและเคสประจำวัน</span>
                 </div>
-                <h2 style={{ fontSize: '1.0625rem', fontWeight: 600, margin: 0 }}>
+                <h2 style={{ fontSize: '1.125rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
                   {format(selectedDay, 'EEEEที่ d MMMM yyyy', { locale: th })}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedDay(null)}
-                aria-label="ปิด"
                 style={{
+                  background: 'transparent',
                   border: 'none',
-                  background: 'none',
+                  color: 'var(--text-secondary)',
                   cursor: 'pointer',
                   padding: '4px',
-                  color: '#9e9690',
-                  display: 'flex',
                 }}
               >
                 <X size={20} />
               </button>
             </div>
 
-            {/* Cases list */}
+            {/* Content for this day */}
             {(() => {
-              const dayEvents = getEventsForDate(selectedDay);
-              if (dayEvents.length === 0) {
+              const dayCases = [...getCasesForDate(selectedDay)].sort(
+                (a, b) =>
+                  new Date(b.actual_updated_at || b.scheduled_at).getTime() -
+                  new Date(a.actual_updated_at || a.scheduled_at).getTime()
+              );
+              const daySchoolEvents = getSchoolEventsForDate(selectedDay);
+              const totalToday = dayCases.length;
+
+              if (totalToday === 0) {
                 return (
-                  <div style={{ textAlign: 'center', padding: '36px 16px', color: '#9e9690' }}>
-                    <CalendarDays size={38} strokeWidth={1.5} style={{ margin: '0 auto 10px', opacity: 0.4 }} />
-                    <p style={{ margin: '0 0 6px 0', fontSize: '0.9375rem', fontWeight: 500, color: '#6e6560' }}>
-                      ไม่มีเคสในวันนี้
+                  <div style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--text-secondary)' }}>
+                    <CalendarDays size={40} strokeWidth={1.5} style={{ margin: '0 auto 10px', opacity: 0.4 }} />
+                    <p style={{ margin: '0 0 6px', fontSize: '0.938rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      ไม่มีเคสดูแลนักเรียนในวันนี้
                     </p>
-                    <p style={{ margin: 0, fontSize: '0.75rem', color: '#b5aca6' }}>
-                      สามารถกดปุ่มด้านล่างเพื่อเปิดเคสใหม่สำหรับวันนี้ได้ทันที
+                    <p style={{ margin: 0, fontSize: '0.813rem' }}>
+                      ท่านสามารถกดปุ่มด้านล่างเพื่อเปิดเคสดูแลนักเรียนใหม่สำหรับวันนี้ได้ทันที
                     </p>
                   </div>
                 );
               }
 
               return (
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: '#8a8280', marginBottom: '10px', fontWeight: 500 }}>
-                    ทั้งหมด {dayEvents.length} เคส
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '360px', overflowY: 'auto', marginBottom: '8px', paddingRight: '2px' }}>
-                    {dayEvents.map((ev) => (
-                      <button
-                        key={ev.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedDay(null);
-                          router.push(`/cases/${ev.id}`);
-                        }}
-                        className="card"
-                        style={{
-                          display: 'block',
-                          width: '100%',
-                          padding: '12px 14px',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          fontFamily: 'inherit',
-                          border: '1px solid var(--border)',
-                          transition: 'border-color 0.15s, transform 0.1s',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                          <span className={`status-badge status-${ev.status}`}>
-                            <span className="status-dot" />
-                            {ev.status === 'planned' ? 'วางแผน' : 'เสร็จสิ้น'}
-                          </span>
-                          <span style={{ fontSize: '0.75rem', color: '#9e9690', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Clock size={13} />
-                            {safeFormatDate(ev.scheduled_at, 'HH:mm น.')}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div>
-                            <div style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                              {getLabel(ev)}
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: '#9e9690', marginTop: '3px' }}>
-                              นักเรียน {ev.student_count} คน
-                            </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '420px', overflowY: 'auto' }}>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '8px' }}>
+                      เคสดูแลนักเรียน ({dayCases.length} เคส)
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {dayCases.map((ev) => (
+                        <button
+                          key={ev.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedDay(null);
+                            router.push(`/cases/${ev.id}`);
+                          }}
+                          className="card"
+                          style={{
+                            display: 'block',
+                            width: '100%',
+                            padding: '12px 14px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            fontFamily: 'inherit',
+                            border: '1px solid var(--border)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span className={`status-badge status-${ev.status}`}>
+                              <span className="status-dot" />
+                              {ev.status === 'planned' ? 'วางแผน' : 'เสร็จสิ้น'}
+                            </span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Clock size={13} />
+                              {safeFormatDate(ev.actual_updated_at || ev.scheduled_at, 'HH:mm น.')}
+                            </span>
                           </div>
-                          <ChevronRight size={18} color="#9e9690" />
-                        </div>
-                      </button>
-                    ))}
+                          <div style={{ fontSize: '0.938rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {getLabel(ev)}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '3px' }}>
+                            นักเรียน {ev.student_count} คน
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               );
             })()}
 
-            {/* Actions */}
+            {/* Bottom Actions */}
             <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
               <button
                 type="button"
@@ -725,37 +924,64 @@ export default function CalendarPage() {
               >
                 ปิด
               </button>
+
               <button
                 type="button"
                 onClick={() => {
                   const dateStr = format(selectedDay, 'yyyy-MM-dd');
                   setSelectedDay(null);
-                  setCreateModalDate(dateStr);
-                  setShowCreateModal(true);
+                  setCreateCaseDate(dateStr);
+                  setShowCreateCaseModal(true);
                 }}
                 className="btn-primary"
-                style={{ flex: 1.2 }}
+                style={{ flex: 1.5 }}
               >
-                <Plus size={16} />
-                เปิดเคสในวันนี้
+                <Plus size={16} /> + เปิดเคสในวันนี้
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Create Case Modal */}
-      {showCreateModal && (
+      {/* 7. Create Case Modal (เคสดูแลนักเรียน) */}
+      {showCreateCaseModal && (
         <CreateCaseModal
-          initialDate={createModalDate}
+          initialDate={createCaseDate}
           onClose={() => {
-            setShowCreateModal(false);
-            setCreateModalDate(undefined);
+            setShowCreateCaseModal(false);
+            setCreateCaseDate(undefined);
           }}
           onCreated={() => {
-            setShowCreateModal(false);
-            setCreateModalDate(undefined);
+            setShowCreateCaseModal(false);
+            setCreateCaseDate(undefined);
             fetchEvents();
+          }}
+        />
+      )}
+
+      {/* 8. Event Modal (เพิ่ม/แก้ไขกิจกรรมโรงเรียน) */}
+      {showEventModal && (
+        <EventModal
+          initialDate={eventModalDate}
+          initialEvent={editingSchoolEvent}
+          onClose={() => {
+            setShowEventModal(false);
+            setEditingSchoolEvent(null);
+          }}
+          onSave={handleSaveSchoolEvent}
+          onDelete={handleDeleteSchoolEvent}
+        />
+      )}
+
+      {/* 9. Event Detail Modal (ดูรายละเอียดกิจกรรมโรงเรียน) */}
+      {viewingSchoolEvent && (
+        <EventDetailModal
+          event={viewingSchoolEvent}
+          onClose={() => setViewingSchoolEvent(null)}
+          onEdit={(eventToEdit) => {
+            setViewingSchoolEvent(null);
+            setEditingSchoolEvent(eventToEdit);
+            setShowEventModal(true);
           }}
         />
       )}

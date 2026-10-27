@@ -2,33 +2,38 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Calendar, Users, LogOut } from 'lucide-react';
-import { useAuth } from '@/lib/auth';
+import { Calendar, Users, HeartHandshake, FileBarChart, Settings } from 'lucide-react';
 
 export function BottomNav() {
   const pathname = usePathname();
-  const { currentUser, logout } = useAuth();
+
+  const links = [
+    { href: '/', label: 'ปฏิทิน', icon: Calendar, isActive: pathname === '/' || pathname.startsWith('/cases') },
+    { href: '/students', label: 'นักเรียน', icon: Users, isActive: pathname.startsWith('/students') },
+    { href: '/parents', label: 'ผู้ปกครอง', icon: HeartHandshake, isActive: pathname.startsWith('/parents') },
+    { href: '/reports', label: 'รายงาน', icon: FileBarChart, isActive: pathname.startsWith('/reports') },
+    { href: '/profile', label: 'ตั้งค่า', icon: Settings, isActive: pathname.startsWith('/profile') || pathname.startsWith('/admin') },
+  ];
 
   return (
     <nav className="bottom-nav">
-      <Link
-        href="/"
-        className={pathname === '/' || pathname.startsWith('/cases') ? 'active' : ''}
-      >
-        <Calendar size={22} strokeWidth={1.8} />
-        <span>ปฏิทิน</span>
-      </Link>
-      <Link
-        href="/students"
-        className={pathname.startsWith('/students') ? 'active' : ''}
-      >
-        <Users size={22} strokeWidth={1.8} />
-        <span>นักเรียน</span>
-      </Link>
-      <button onClick={logout} title={`ออกจากระบบ (${currentUser?.name})`}>
-        <LogOut size={22} strokeWidth={1.8} />
-        <span>ออก</span>
-      </button>
+      {links.map((link) => {
+        const Icon = link.icon;
+        const active = link.isActive;
+        return (
+          <Link
+            key={link.href}
+            href={link.href}
+            className={active ? 'active' : ''}
+            style={{
+              color: active ? 'var(--primary)' : 'var(--text-secondary)',
+            }}
+          >
+            <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
+            <span style={{ fontWeight: active ? 600 : 400 }}>{link.label}</span>
+          </Link>
+        );
+      })}
     </nav>
   );
 }

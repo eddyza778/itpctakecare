@@ -265,9 +265,22 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
         </div>
 
         {/* วันเวลา */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: '#8a8280', fontSize: '0.875rem' }}>
-          <Clock size={16} strokeWidth={1.8} />
-          {safeFormatDate(caseData.scheduled_at, 'd MMMM yyyy เวลา HH:mm น.')}
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginBottom: '16px', color: '#8a8280', fontSize: '0.875rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Clock size={16} strokeWidth={1.8} />
+            <span>เวลานัด: {safeFormatDate(caseData.scheduled_at, 'd MMMM yyyy เวลา HH:mm น.')}</span>
+          </div>
+          {(() => {
+            const latestUpdate = caseData.updates[caseData.updates.length - 1]?.created_at || caseData.updated_at;
+            if (latestUpdate && latestUpdate !== caseData.scheduled_at) {
+              return (
+                <span style={{ fontSize: '0.8125rem', color: '#9e9690' }}>
+                  • อัปเดตจริง: {safeFormatDate(latestUpdate, 'd MMM yyyy เวลา HH:mm น.')}
+                </span>
+              );
+            }
+            return null;
+          })()}
         </div>
 
         {/* รายละเอียด */}
@@ -531,7 +544,7 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
       )}
 
       {/* Hidden Printable Report for PDF Export */}
-      <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+      <div style={{ position: 'fixed', left: 0, top: 0, width: '760px', opacity: 0, pointerEvents: 'none', zIndex: -999 }}>
         <div
           ref={caseReportRef}
           style={{
@@ -556,7 +569,7 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
           >
             <div>
               <h1 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 4px 0', color: '#784ba3' }}>
-                ITPC Techcare — รายงานการดูแลนักเรียนรายเคส
+                itpctakecare — รายงานการดูแลนักเรียนรายเคส
               </h1>
               <p style={{ fontSize: '12px', color: '#666', margin: 0 }}>
                 คณะเทคโนโลยีสารสนเทศและการสื่อสาร มหาวิทยาลัยเชียงใหม่

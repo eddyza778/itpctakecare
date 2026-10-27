@@ -9,14 +9,33 @@ export interface Student {
   grade: string | null;
   room: number | null;
   gender: string | null;
+  academic_year?: string | null; // ปีการศึกษา เช่น "2569"
   created_at: string | null;
   updated_at: string | null;
+  closed_at?: string | null; // ไม่ null = ถูกปิด
 }
+
+export type CaretakerRole = 'admin' | 'caretaker';
 
 export interface Caretaker {
   id: string;
   name: string;
+  role?: CaretakerRole;
 }
+
+// ใช้เฉพาะหน้า Admin (รวมบัญชีที่ถูกปิด)
+export interface CaretakerAccount {
+  id: string;
+  name: string;
+  role: CaretakerRole;
+  closed_at: string | null;
+  created_at: string | null;
+}
+
+export const ROLE_LABELS: Record<CaretakerRole, string> = {
+  admin: 'ผู้ดูแลระบบ',
+  caretaker: 'ครูผู้ดูแล',
+};
 
 export interface Case {
   id: string;
@@ -65,6 +84,9 @@ export interface CalendarEvent {
   scheduled_at: string;
   status: Case['status'];
   student_count: number;
+  created_at?: string;
+  updated_at?: string;
+  actual_updated_at?: string;
 }
 
 export const CASE_TYPE_LABELS: Record<Case['case_type'], string> = {

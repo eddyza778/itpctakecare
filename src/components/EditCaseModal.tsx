@@ -310,6 +310,7 @@ export function EditCaseModal({ caseData, onClose, onUpdated }: Props) {
                           {s.first_name_th} {s.last_name_th} ({s.nickname_th})
                           <span style={{ color: '#9e9690', marginLeft: '6px', fontSize: '0.75rem' }}>
                             {s.grade}/{s.room}
+                            {s.academic_year && ` (ปี ${s.academic_year})`}
                           </span>
                         </span>
                         {isSelected && <Check size={14} color="var(--primary)" />}

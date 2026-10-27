@@ -11,7 +11,7 @@ CREATE OR REPLACE FUNCTION verify_pin(p_caretaker_id uuid, p_pin text)
 RETURNS json
 LANGUAGE plpgsql
 SECURITY DEFINER          -- รันด้วยสิทธิ์เจ้าของฟังก์ชัน
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_name     text;
@@ -43,7 +43,7 @@ CREATE OR REPLACE FUNCTION get_caretakers()
 RETURNS TABLE (id uuid, name text)
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
   SELECT id, name FROM caretakers ORDER BY name;
 $$;
@@ -66,7 +66,7 @@ CREATE OR REPLACE FUNCTION create_case_with_relations(
 RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_case_id uuid;

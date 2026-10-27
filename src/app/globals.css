@@ -1,43 +1,75 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
 :root {
-  --primary: #784ba3;
-  --primary-light: #9f77b4;
-  --primary-dark: #5c3582;
-  --background: #faf8f5;
-  --foreground: #3d3536;
-  --card-bg: #ffffff;
-  --border: #e8e2de;
-  --border-light: #f0ece8;
+  /* 1. Theme & Color Palette - โรงเรียนสาธิตมหาวิทยาลัยเชียงใหม่ */
+  --primary: #9f77b4;         /* สีม่วงหลัก */
+  --primary-hover: #8e65a4;
+  --primary-light: #c8b4d8;   /* สีม่วงอ่อน (Secondary) */
+  --primary-dark: #7b5391;
+  --secondary: #c8b4d8;       /* สีม่วงอ่อน */
+  --accent: #f3eafa;          /* สีพื้นหลังม่วงอ่อน */
+  --background: #FCFAFD;      /* สีพื้นหลังหลัก */
+  --surface: #FFFFFF;         /* พื้นหลัง Card และ Sidebar */
+  --card-bg: #FFFFFF;
+  --foreground: #35263F;      /* สีข้อความหลัก (Text Primary) */
+  --text-primary: #35263F;
+  --text-secondary: #887B91;  /* สีข้อความรอง (Text Secondary) */
+
+  --border: #EDE4F3;
+  --border-light: #F7F3FB;
+  --sidebar-width: 272px; /* Fixed sidebar width (between w-64 and w-72) */
+
+  /* Status Colors */
+  --success: #75B798;
+  --warning: #F2C879;
+  --danger: #E88989;
+
+  /* Event category badges */
+  --event-holiday-bg: #fde8e8;
+  --event-holiday-text: #c53030;
+  --event-holiday-border: #f8b4b4;
+
+  --event-academic-bg: #f3eafa;
+  --event-academic-text: #7b5391;
+  --event-academic-border: #c8b4d8;
+
+  --event-meeting-bg: #fef7e6;
+  --event-meeting-text: #b7791f;
+  --event-meeting-border: #fbd38d;
+
+  --event-special-bg: #e8f7f0;
+  --event-special-text: #2c7a57;
+  --event-special-border: #a7e4cb;
 
   /* สีพาสเทล */
-  --peach: #fde8d8;
+  --peach: #fef1e8;
   --peach-text: #9e6b4a;
-  --mint: #d4f0e7;
-  --mint-text: #3d7a63;
-  --sky: #d6eaf8;
-  --sky-text: #3a6d8e;
-  --cream: #fdf5e6;
+  --mint: #e8f7f0;
+  --mint-text: #2c7a57;
+  --sky: #e9f2fb;
+  --sky-text: #346d98;
+  --cream: #fdf8ed;
   --cream-text: #8a7340;
-  --rose: #f8e0e6;
-  --rose-text: #8a4a5a;
-  --lavender: #ede4f3;
-  --lavender-text: #6b4f80;
+  --rose: #fde8e8;
+  --rose-text: #9b2c2c;
+  --lavender: #f3eafa;
+  --lavender-text: #7b5391;
 
   /* สถานะ */
-  --status-planned: #ffedd5;
-  --status-planned-text: #c2410c;
-  --status-planned-dot: #ea580c;
-  --status-done: #d4f0e7;
-  --status-done-text: #3d7a63;
-  --status-done-dot: #5cb88f;
+  --status-planned: #fef7e6;
+  --status-planned-text: #c05621;
+  --status-planned-dot: #dd6b20;
+  --status-done: #e8f7f0;
+  --status-done-text: #276749;
+  --status-done-dot: #75B798;
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md: 0 2px 8px rgba(0,0,0,0.06);
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  --shadow-sm: 0 1px 3px rgba(53, 38, 63, 0.04);
+  --shadow-md: 0 3px 12px rgba(53, 38, 63, 0.06);
+  --shadow-lg: 0 8px 24px rgba(159, 119, 180, 0.12);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
 }
 
 @theme inline {
@@ -57,7 +89,7 @@
   --color-lavender: var(--lavender);
   --color-status-planned: var(--status-planned);
   --color-status-done: var(--status-done);
-  --font-thai: 'Noto Sans Thai', sans-serif;
+  --font-thai: 'Sarabun', 'Noto Sans Thai', sans-serif;
 }
 
 * {
@@ -73,7 +105,7 @@ html, body {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Noto Sans Thai', sans-serif;
+  font-family: 'Sarabun', 'Noto Sans Thai', -apple-system, BlinkMacSystemFont, sans-serif;
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
 }
@@ -87,58 +119,76 @@ body {
   border: none;
   border-radius: var(--radius-sm);
   padding: 10px 20px;
-  font-family: 'Noto Sans Thai', sans-serif;
+  font-family: inherit;
   font-weight: 500;
   font-size: 0.938rem;
   cursor: pointer;
-  transition: background-color 0.15s ease, transform 0.1s ease;
+  transition: all 0.18s ease;
   min-height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
+  box-shadow: 0 2px 6px rgba(159, 119, 180, 0.25);
 }
-.btn-primary:hover { background-color: var(--primary-dark); }
-.btn-primary:active { transform: scale(0.97); }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(159, 119, 180, 0.32);
+}
+.btn-primary:active {
+  transform: translateY(0);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
 
 .btn-secondary {
-  background-color: transparent;
+  background-color: #ffffff;
   color: var(--foreground);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 10px 20px;
-  font-family: 'Noto Sans Thai', sans-serif;
+  padding: 10px 18px;
+  font-family: inherit;
   font-weight: 500;
   font-size: 0.938rem;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: all 0.18s ease;
   min-height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
 }
-.btn-secondary:hover { background-color: var(--border-light); border-color: var(--primary-light); }
+.btn-secondary:hover {
+  background-color: var(--accent);
+  border-color: var(--primary-light);
+  color: var(--primary-dark);
+}
 
 .btn-danger {
-  background-color: #e8a0a0;
-  color: #6e2d2d;
-  border: none;
+  background-color: #fde8e8;
+  color: #c53030;
+  border: 1px solid #f8b4b4;
   border-radius: var(--radius-sm);
-  padding: 10px 20px;
-  font-family: 'Noto Sans Thai', sans-serif;
+  padding: 10px 18px;
+  font-family: inherit;
   font-weight: 500;
   font-size: 0.938rem;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: all 0.18s ease;
   min-height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
 }
-.btn-danger:hover { background-color: #d88a8a; }
+.btn-danger:hover {
+  background-color: #fed7d7;
+  color: #9b2c2c;
+}
 
 /* ============================================================= */
 /* การ์ดและพื้นผิว */
@@ -466,41 +516,174 @@ select.input-field {
   }
 }
 
-.app-content {
-  padding-bottom: 72px;
+/* ============================================================= */
+/* App Layout Structure */
+/* ============================================================= */
+.desktop-sidebar {
+  display: none !important;
 }
 
-/* ============================================================= */
-/* Desktop sidebar layout (≥768px) */
-/* ============================================================= */
+.mobile-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  padding: 0 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.app-main {
+  margin-left: 0;
+  padding-bottom: 84px;
+  min-height: 100vh;
+}
+
+.mobile-bottom-nav {
+  display: block;
+}
+
+/* Desktop Breakpoint (≥768px) */
 @media (min-width: 768px) {
+  .app-layout {
+    display: flex;
+    width: 100%;
+    min-height: 100vh;
+  }
+  .mobile-topbar {
+    display: none !important;
+  }
+  .mobile-bottom-nav {
+    display: none !important;
+  }
   .bottom-nav {
+    display: none !important;
+  }
+  .desktop-sidebar {
+    display: flex !important;
+    flex-direction: column;
     position: fixed;
     top: 0;
     left: 0;
     bottom: 0;
-    right: auto;
-    width: 72px;
-    flex-direction: column;
-    border-top: none;
+    width: var(--sidebar-width);
+    min-width: var(--sidebar-width);
+    max-width: var(--sidebar-width);
+    flex-shrink: 0;
+    background: var(--surface);
     border-right: 1px solid var(--border);
-    padding-top: 16px;
-    justify-content: flex-start;
-    gap: 4px;
-    box-shadow: 1px 0 3px rgba(0,0,0,0.02);
+    z-index: 50;
+    overflow-y: auto;
+    box-sizing: border-box;
   }
-  .bottom-nav a,
-  .bottom-nav button {
-    padding: 14px 0;
-  }
-  .app-content {
-    margin-left: 72px;
-    padding-bottom: 28px;
+  .app-main {
+    margin-left: var(--sidebar-width) !important;
+    width: calc(100% - var(--sidebar-width)) !important;
+    max-width: calc(100% - var(--sidebar-width)) !important;
+    flex: 1 1 0% !important;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 36px;
+    box-sizing: border-box;
   }
   .fab {
-    bottom: 28px;
-    right: 28px;
+    bottom: 32px;
+    right: 32px;
   }
+}
+
+.page-container-fluid {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* Sidebar navigation items */
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.938rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.18s ease;
+  margin-bottom: 4px;
+  border-left: 3px solid transparent;
+}
+.sidebar-nav-item:hover {
+  background: var(--accent);
+  color: var(--primary-dark);
+}
+.sidebar-nav-item.active {
+  background: var(--accent);
+  color: var(--primary-dark);
+  font-weight: 600;
+  border-left-color: var(--primary);
+}
+.sidebar-nav-item.active svg {
+  color: var(--primary);
+}
+
+/* Event category badges */
+.badge-holiday {
+  background-color: var(--event-holiday-bg);
+  color: var(--event-holiday-text);
+  border: 1px solid var(--event-holiday-border);
+}
+.badge-academic {
+  background-color: var(--event-academic-bg);
+  color: var(--event-academic-text);
+  border: 1px solid var(--event-academic-border);
+}
+.badge-meeting {
+  background-color: var(--event-meeting-bg);
+  color: var(--event-meeting-text);
+  border: 1px solid var(--event-meeting-border);
+}
+.badge-special {
+  background-color: var(--event-special-bg);
+  color: var(--event-special-text);
+  border: 1px solid var(--event-special-border);
+}
+.badge-case {
+  background-color: var(--accent);
+  color: var(--primary-dark);
+  border: 1px solid var(--secondary);
+}
+
+/* FAB button */
+.fab {
+  position: fixed;
+  bottom: 84px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(159, 119, 180, 0.45);
+  border: none;
+  cursor: pointer;
+  z-index: 35;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+}
+.fab:hover {
+  transform: scale(1.06);
+  background: var(--primary-hover);
+  box-shadow: 0 6px 20px rgba(159, 119, 180, 0.55);
+}
+.fab:active {
+  transform: scale(0.95);
 }
 
 /* ============================================================= */
@@ -508,12 +691,15 @@ select.input-field {
 /* ============================================================= */
 @media print {
   .bottom-nav,
+  .mobile-bottom-nav,
+  .desktop-sidebar,
+  .mobile-topbar,
   .fab,
   .no-print,
   button:not(.print-include) {
     display: none !important;
   }
-  body, .app-content {
+  body, .app-main {
     background: #ffffff !important;
     color: #111111 !important;
     margin: 0 !important;

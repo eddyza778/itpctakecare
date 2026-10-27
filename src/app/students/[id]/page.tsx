@@ -10,7 +10,7 @@ import {
   FileSpreadsheet,
   FileDown,
   Edit,
-  Trash2,
+  Archive,
   CheckCircle2,
   AlertCircle,
   Plus,
@@ -20,7 +20,8 @@ import {
 import { format, parseISO } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { safeFormatDate } from '@/lib/date';
-import { getStudentById, getStudentCases, deleteStudent } from '@/lib/queries';
+import { getStudentById, getStudentCases, setStudentClosed } from '@/lib/queries';
+import { useAuth } from '@/lib/auth';
 import type { Student, CaseWithRelations } from '@/lib/types';
 import { CASE_TYPE_LABELS } from '@/lib/types';
 import { StudentModal } from '@/components/StudentModal';
@@ -32,6 +33,7 @@ import { exportElementToPdf } from '@/lib/pdf';
 export default function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const { currentUser, isAdmin } = useAuth();
 
   const [student, setStudent] = useState<Student | null>(null);
   const [cases, setCases] = useState<CaseWithRelations[]>([]);
@@ -50,7 +52,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
   const fetchStudentData = useCallback(async () => {
     try {
-      const [s, c] = await Promise.all([getStudentById(id), getStudentCases(id)]);
+      const [s, c] = await Promise.all([
+        getStudentById(id),
+        getStudentCases(id, currentUser?.id),
+      ]);
       setStudent(s);
       setCases(c);
     } catch {
@@ -58,19 +63,20 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, currentUser]);
 
   useEffect(() => {
     fetchStudentData();
   }, [fetchStudentData]);
 
   const handleDelete = async () => {
+    if (!currentUser || !isAdmin) return;
     setDeleting(true);
     try {
-      await deleteStudent(id);
+      await setStudentClosed(currentUser.id, id, true);
       router.push('/students');
     } catch {
-      setError('ไม่สามารถลบข้อมูลนักเรียนได้');
+      setError('ไม่สามารถปิดข้อมูลนักเรียนได้');
       setDeleting(false);
     }
   };
@@ -143,22 +149,24 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           <ArrowLeft size={22} />
         </button>
         <h1 style={{ fontSize: '1.0625rem', fontWeight: 600, margin: 0, flex: 1 }}>ประวัตินักเรียน</h1>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <button
-            onClick={() => setShowEditModal(true)}
-            style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '6px', color: '#9e9690' }}
-            title="แก้ไขข้อมูลนักเรียน"
-          >
-            <Edit size={19} />
-          </button>
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '6px', color: '#d88a8a' }}
-            title="ลบนักเรียน"
-          >
-            <Trash2 size={19} />
-          </button>
-        </div>
+        {isAdmin && (
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button
+              onClick={() => setShowEditModal(true)}
+              style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '6px', color: '#9e9690' }}
+              title="แก้ไขข้อมูลนักเรียน"
+            >
+              <Edit size={19} />
+            </button>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '6px', color: '#d88a8a' }}
+              title="ปิดนักเรียน"
+            >
+              <Archive size={19} />
+            </button>
+          </div>
+        )}
       </div>
 
       <div style={{ padding: '16px' }}>
@@ -212,13 +220,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
+              gridTemplateColumns: 'repeat(4, 1fr)',
               gap: '10px',
               paddingTop: '12px',
               borderTop: '1px solid rgba(0,0,0,0.06)',
               fontSize: '0.8125rem',
             }}
           >
+            <div>
+              <span style={{ color: '#8a8280', display: 'block', fontSize: '0.6875rem' }}>ปีการศึกษา</span>
+              <span style={{ fontWeight: 600, color: 'var(--primary-dark)' }}>{student.academic_year || '2569'}</span>
+            </div>
             <div>
               <span style={{ color: '#8a8280', display: 'block', fontSize: '0.6875rem' }}>รหัสนักเรียน</span>
               <span style={{ fontWeight: 500 }}>{student.student_id || '-'}</span>
@@ -351,7 +363,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: '#8a8280', marginBottom: '8px' }}>
                     <Clock size={13} />
-                    {safeFormatDate(c.scheduled_at, 'd MMMM yyyy เวลา HH:mm น.')}
+                    {safeFormatDate(c.updates[c.updates.length - 1]?.created_at || c.updated_at || c.scheduled_at, 'd MMMM yyyy เวลา HH:mm น.')}
                   </div>
 
                   {c.details && (
@@ -415,7 +427,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* Hidden / Report Template for Clean PDF Export (Guaranteed Thai Typography) */}
-      <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+      <div style={{ position: 'fixed', left: 0, top: 0, width: '760px', opacity: 0, pointerEvents: 'none', zIndex: -999 }}>
         <div
           ref={reportRef}
           style={{
@@ -440,7 +452,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
           >
             <div>
               <h1 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 4px 0', color: '#784ba3' }}>
-                ITPC Techcare — รายงานประวัติการดูแลนักเรียนรายเคส
+                itpctakecare — รายงานประวัติการดูแลนักเรียนรายเคส
               </h1>
               <p style={{ fontSize: '12px', color: '#666', margin: 0 }}>
                 คณะเทคโนโลยีสารสนเทศและการสื่อสาร มหาวิทยาลัยเชียงใหม่
@@ -464,9 +476,12 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             <h2 style={{ fontSize: '15px', fontWeight: 600, margin: '0 0 10px 0', color: '#5c3582' }}>
               ข้อมูลนักเรียน
             </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', fontSize: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px', fontSize: '12px' }}>
               <div>
                 <strong>ชื่อ-นามสกุล:</strong> {student.first_name_th} {student.last_name_th}
+              </div>
+              <div>
+                <strong>ปีการศึกษา:</strong> {student.academic_year || '2569'}
               </div>
               <div>
                 <strong>ชื่อเล่น:</strong> {student.nickname_th || '-'}
@@ -596,9 +611,9 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
       {/* Delete Confirmation */}
       {showDeleteConfirm && (
         <ConfirmDialog
-          title={`ลบนักเรียน ${student.first_name_th} ${student.last_name_th}?`}
-          message="ข้อมูลนักเรียนและการเชื่อมโยงเคสจะถูกลบทั้งหมด ยืนยันการลบ?"
-          confirmLabel={deleting ? 'กำลังลบ...' : 'ลบนักเรียน'}
+          title={`ปิดนักเรียน ${student.first_name_th} ${student.last_name_th}?`}
+          message="นักเรียนจะไม่แสดงในระบบอีก (ประวัติเคสไม่ถูกลบ) ผู้ดูแลระบบเปิดใช้งานคืนได้ที่หน้าจัดการ"
+          confirmLabel={deleting ? 'กำลังปิด...' : 'ปิดนักเรียน'}
           onConfirm={handleDelete}
           onCancel={() => setShowDeleteConfirm(false)}
         />

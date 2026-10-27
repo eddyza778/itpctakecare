@@ -7,26 +7,31 @@ import {
   Plus,
   Users,
   Edit,
-  Trash2,
+  Archive,
   ChevronRight,
   BookOpen,
   X,
+  FileSpreadsheet,
 } from 'lucide-react';
-import { getStudentsWithCaseCounts, deleteStudent } from '@/lib/queries';
+import { getStudentsWithCaseCounts, setStudentClosed } from '@/lib/queries';
+import { useAuth } from '@/lib/auth';
 import type { Student } from '@/lib/types';
 import { StudentModal } from '@/components/StudentModal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { exportStudentsListToExcel } from '@/lib/excel';
 
 type StudentWithCount = Student & { case_count: number };
 
 export default function StudentsPage() {
   const router = useRouter();
+  const { currentUser, isAdmin } = useAuth();
   const [students, setStudents] = useState<StudentWithCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   // Filters
   const [search, setSearch] = useState('');
+  const [yearFilter, setYearFilter] = useState('');
   const [gradeFilter, setGradeFilter] = useState('');
   const [roomFilter, setRoomFilter] = useState('');
 
@@ -37,7 +42,8 @@ export default function StudentsPage() {
   const [deleting, setDeleting] = useState(false);
 
   const fetchStudents = useCallback(async () => {
-    setLoading(false);
+    if (!currentUser) return;
+    setLoading(true);
     try {
       const data = await getStudentsWithCaseCounts();
       setStudents(data);
@@ -46,23 +52,39 @@ export default function StudentsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => {
-    fetchStudents();
-  }, [fetchStudents]);
+    if (currentUser) {
+      fetchStudents();
+    }
+  }, [fetchStudents, currentUser]);
 
-  const grades = [...new Set(students.map((s) => s.grade).filter(Boolean))].sort() as string[];
+  // ตัวเลือกตัวกรอง
+  const academicYears = [
+    ...new Set(students.map((s) => s.academic_year).filter(Boolean)),
+  ].sort().reverse() as string[];
+
+  const grades = [
+    ...new Set(
+      students
+        .filter((s) => !yearFilter || s.academic_year === yearFilter)
+        .map((s) => s.grade)
+        .filter(Boolean)
+    ),
+  ].sort() as string[];
+
   const rooms = [
     ...new Set(
       students
-        .filter((s) => !gradeFilter || s.grade === gradeFilter)
+        .filter((s) => (!yearFilter || s.academic_year === yearFilter) && (!gradeFilter || s.grade === gradeFilter))
         .map((s) => s.room)
         .filter((r) => r !== null)
     ),
   ].sort() as number[];
 
   const filtered = students.filter((s) => {
+    if (yearFilter && s.academic_year !== yearFilter) return false;
     if (gradeFilter && s.grade !== gradeFilter) return false;
     if (roomFilter && s.room !== Number(roomFilter)) return false;
     if (search) {
@@ -78,21 +100,25 @@ export default function StudentsPage() {
   });
 
   const handleDelete = async () => {
-    if (!deletingStudent) return;
+    if (!deletingStudent || !currentUser || !isAdmin) return;
     setDeleting(true);
     try {
-      await deleteStudent(deletingStudent.id);
+      await setStudentClosed(currentUser.id, deletingStudent.id, true);
       setDeletingStudent(null);
       await fetchStudents();
     } catch {
-      setError('ไม่สามารถลบข้อมูลนักเรียนได้');
+      setError('ไม่สามารถปิดข้อมูลนักเรียนได้');
     } finally {
       setDeleting(false);
     }
   };
 
+  const handleExportExcel = () => {
+    exportStudentsListToExcel(filtered, yearFilter ? `ปี_${yearFilter}` : undefined);
+  };
+
   return (
-    <div className="page-container" style={{ paddingBottom: '40px' }}>
+    <div className="page-container page-container-fluid" style={{ maxWidth: '100%', width: '100%', padding: '0 28px 40px', boxSizing: 'border-box' }}>
       {/* Header */}
       <div
         style={{
@@ -112,20 +138,36 @@ export default function StudentsPage() {
             รายชื่อนักเรียน
           </h1>
           <p style={{ fontSize: '0.75rem', color: '#9e9690', margin: '2px 0 0 0' }}>
-            ทั้งหมด {students.length} คน
+            ทั้งหมด {students.length} คน {yearFilter ? `(ปีการศึกษา ${yearFilter})` : ''}
           </p>
         </div>
-        <button
-          onClick={() => {
-            setEditingStudent(null);
-            setShowModal(true);
-          }}
-          className="btn-primary"
-          style={{ padding: '8px 14px', fontSize: '0.8125rem', height: '38px', minHeight: '38px' }}
-        >
-          <Plus size={16} />
-          เพิ่มนักเรียน
-        </button>
+
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={handleExportExcel}
+            className="btn-secondary"
+            style={{ padding: '8px 12px', fontSize: '0.8125rem', height: '38px', minHeight: '38px' }}
+            title="ส่งออกรายชื่อเป็นไฟล์ Excel"
+          >
+            <FileSpreadsheet size={16} />
+            <span className="hide-mobile">ส่งออก Excel</span>
+          </button>
+
+          {isAdmin && (
+            <button
+              id="add-student-btn"
+              onClick={() => {
+                setEditingStudent(null);
+                setShowModal(true);
+              }}
+              className="btn-primary"
+              style={{ padding: '8px 14px', fontSize: '0.8125rem', height: '38px', minHeight: '38px' }}
+            >
+              <Plus size={16} />
+              เพิ่มนักเรียน
+            </button>
+          )}
+        </div>
       </div>
 
       <div style={{ padding: '16px 0' }}>
@@ -141,6 +183,7 @@ export default function StudentsPage() {
             backgroundColor: '#ffffff',
           }}
         >
+          {/* Search box */}
           <div style={{ position: 'relative' }}>
             <Search
               size={18}
@@ -183,8 +226,29 @@ export default function StudentsPage() {
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <div style={{ flex: 1 }}>
+          {/* Filters Row: ปีการศึกษา, ระดับชั้น, ห้อง */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
+            {/* ปีการศึกษา */}
+            <div>
+              <select
+                className="input-field"
+                value={yearFilter}
+                onChange={(e) => {
+                  setYearFilter(e.target.value);
+                  setGradeFilter('');
+                  setRoomFilter('');
+                }}
+                style={{ fontSize: '0.8125rem', minHeight: '40px' }}
+              >
+                <option value="">ทุกปีการศึกษา</option>
+                {academicYears.map((y) => (
+                  <option key={y} value={y}>ปี {y}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* ระดับชั้น */}
+            <div>
               <select
                 className="input-field"
                 value={gradeFilter}
@@ -200,7 +264,9 @@ export default function StudentsPage() {
                 ))}
               </select>
             </div>
-            <div style={{ flex: 1 }}>
+
+            {/* ห้อง */}
+            <div>
               <select
                 className="input-field"
                 value={roomFilter}
@@ -213,25 +279,27 @@ export default function StudentsPage() {
                 ))}
               </select>
             </div>
-            {(gradeFilter || roomFilter) && (
+
+            {(yearFilter || gradeFilter || roomFilter) && (
               <button
                 type="button"
                 onClick={() => {
+                  setYearFilter('');
                   setGradeFilter('');
                   setRoomFilter('');
                 }}
                 className="btn-secondary"
                 style={{ padding: '0 12px', fontSize: '0.75rem', minHeight: '40px', whiteSpace: 'nowrap' }}
-                title="ล้างตัวกรองชั้น/ห้อง"
+                title="ล้างตัวกรองทั้งหมด"
               >
-                ล้าง
+                ล้างตัวกรอง
               </button>
             )}
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: '#8a8280', paddingTop: '2px' }}>
             <span>แสดง <strong>{filtered.length}</strong> จาก {students.length} คน</span>
-            {(search || gradeFilter || roomFilter) && (
+            {(search || yearFilter || gradeFilter || roomFilter) && (
               <span style={{ color: 'var(--primary)', fontWeight: 600 }}>
                 กำลังกรองข้อมูล
               </span>
@@ -263,7 +331,7 @@ export default function StudentsPage() {
           <div className="empty-state">
             <Users size={40} strokeWidth={1.5} style={{ margin: '0 auto 12px auto', color: '#b5aca6' }} />
             <p style={{ margin: 0 }}>
-              {search || gradeFilter || roomFilter ? 'ไม่พบนักเรียนตามเงื่อนไขที่ค้นหา' : 'ยังไม่มีข้อมูลนักเรียน'}
+              {search || yearFilter || gradeFilter || roomFilter ? 'ไม่พบนักเรียนตามเงื่อนไขที่ค้นหา' : 'ยังไม่มีข้อมูลนักเรียน'}
             </p>
           </div>
         ) : (
@@ -331,14 +399,32 @@ export default function StudentsPage() {
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', fontSize: '0.75rem' }}>
+                      {/* Badge ปีการศึกษา */}
+                      {s.academic_year && (
+                        <span
+                          className="chip"
+                          style={{
+                            fontSize: '0.6875rem',
+                            padding: '2px 8px',
+                            fontWeight: 600,
+                            background: 'var(--peach)',
+                            color: 'var(--peach-text)',
+                          }}
+                        >
+                          ปี {s.academic_year}
+                        </span>
+                      )}
+
                       <span className="chip chip-sky" style={{ fontSize: '0.6875rem', padding: '2px 8px', fontWeight: 600 }}>
                         {s.grade ? `${s.grade}/${s.room || 1}` : 'ไม่ระบุห้อง'}
                       </span>
+
                       {s.student_id && (
                         <span style={{ color: '#7a706b', fontSize: '0.75rem', background: 'var(--border-light)', padding: '2px 8px', borderRadius: '100px' }}>
                           รหัส {s.student_id}
                         </span>
                       )}
+
                       <span
                         className={s.case_count > 0 ? 'chip chip-lavender' : 'chip'}
                         style={{
@@ -360,45 +446,49 @@ export default function StudentsPage() {
                     style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingStudent(s);
-                        setShowModal(true);
-                      }}
-                      style={{
-                        border: '1px solid var(--border)',
-                        background: 'var(--card-bg)',
-                        cursor: 'pointer',
-                        padding: '7px',
-                        color: '#6e6560',
-                        borderRadius: 'var(--radius-sm)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                      title="แก้ไขข้อมูลนักเรียน"
-                    >
-                      <Edit size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeletingStudent(s)}
-                      style={{
-                        border: '1px solid var(--border)',
-                        background: 'var(--card-bg)',
-                        cursor: 'pointer',
-                        padding: '7px',
-                        color: '#d88a8a',
-                        borderRadius: 'var(--radius-sm)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                      title="ลบนักเรียน"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {isAdmin && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingStudent(s);
+                            setShowModal(true);
+                          }}
+                          style={{
+                            border: '1px solid var(--border)',
+                            background: 'var(--card-bg)',
+                            cursor: 'pointer',
+                            padding: '7px',
+                            color: '#6e6560',
+                            borderRadius: 'var(--radius-sm)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          title="แก้ไขข้อมูลนักเรียน"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeletingStudent(s)}
+                          style={{
+                            border: '1px solid var(--border)',
+                            background: 'var(--card-bg)',
+                            cursor: 'pointer',
+                            padding: '7px',
+                            color: '#d88a8a',
+                            borderRadius: 'var(--radius-sm)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          title="ปิดนักเรียน"
+                        >
+                          <Archive size={16} />
+                        </button>
+                      </>
+                    )}
                     <button
                       type="button"
                       onClick={() => router.push(`/students/${s.id}`)}
@@ -446,9 +536,9 @@ export default function StudentsPage() {
       {/* Delete Confirmation */}
       {deletingStudent && (
         <ConfirmDialog
-          title={`ลบนักเรียน ${deletingStudent.first_name_th} ${deletingStudent.last_name_th}?`}
-          message="ข้อมูลของนักเรียนและประวัติการเชื่อมโยงจะถูกลบ ไม่สามารถกู้คืนได้"
-          confirmLabel={deleting ? 'กำลังลบ...' : 'ลบข้อมูลนักเรียน'}
+          title={`ปิดนักเรียน ${deletingStudent.first_name_th} ${deletingStudent.last_name_th}?`}
+          message="นักเรียนจะไม่แสดงในระบบอีก (ประวัติเคสไม่ถูกลบ) ผู้ดูแลระบบเปิดใช้งานคืนได้ที่หน้าจัดการ"
+          confirmLabel={deleting ? 'กำลังปิด...' : 'ปิดนักเรียน'}
           onConfirm={handleDelete}
           onCancel={() => setDeletingStudent(null)}
         />

@@ -24,3 +24,11 @@ export function safeParseDate(dateStr: string | null | undefined): Date {
     return new Date(NaN);
   }
 }
+
+// คืนปีการศึกษาปัจจุบันตาม พ.ศ. (เริ่มพฤษภาคม = ภาคเรียนที่ 1)
+export function getDefaultAcademicYear(): string {
+  const now = new Date();
+  const yearBE = now.getFullYear() + 543;
+  const academicYear = now.getMonth() >= 4 ? yearBE : yearBE - 1;
+  return String(academicYear);
+}

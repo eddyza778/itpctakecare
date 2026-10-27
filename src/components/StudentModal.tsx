@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { createStudent, updateStudent } from '@/lib/queries';
+import { useAuth } from '@/lib/auth';
 import type { Student } from '@/lib/types';
+import { getDefaultAcademicYear } from '@/lib/date';
 
 interface Props {
   student?: Student | null; // If provided, edit mode; else create mode
@@ -12,7 +14,9 @@ interface Props {
 }
 
 export function StudentModal({ student, onClose, onSaved }: Props) {
+  const { currentUser, isAdmin } = useAuth();
   const isEdit = !!student;
+  const [academicYear, setAcademicYear] = useState(student?.academic_year || getDefaultAcademicYear());
   const [studentId, setStudentId] = useState(student?.student_id || '');
   const [firstName, setFirstName] = useState(student?.first_name_th || '');
   const [lastName, setLastName] = useState(student?.last_name_th || '');
@@ -22,6 +26,8 @@ export function StudentModal({ student, onClose, onSaved }: Props) {
   const [gender, setGender] = useState(student?.gender || 'ชาย');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  if (!isAdmin) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,8 +40,11 @@ export function StudentModal({ student, onClose, onSaved }: Props) {
     setError('');
 
     try {
+      if (!currentUser || !isAdmin) throw new Error('ไม่มีสิทธิ์ (ต้องเป็นผู้ดูแลระบบ)');
+      const yearVal = academicYear.trim() || getDefaultAcademicYear();
       if (isEdit && student) {
-        await updateStudent(student.id, {
+        await updateStudent(currentUser.id, student.id, {
+          academic_year: yearVal,
           student_id: studentId.trim() || null,
           first_name_th: firstName.trim(),
           last_name_th: lastName.trim(),
@@ -45,7 +54,8 @@ export function StudentModal({ student, onClose, onSaved }: Props) {
           gender: gender || null,
         });
       } else {
-        await createStudent({
+        await createStudent(currentUser.id, {
+          academic_year: yearVal,
           student_id: studentId.trim() || null,
           first_name_th: firstName.trim(),
           last_name_th: lastName.trim(),
@@ -102,17 +112,33 @@ export function StudentModal({ student, onClose, onSaved }: Props) {
         </div>
 
         <form onSubmit={handleSubmit}>
-          {/* รหัสนักเรียน */}
-          <div style={{ marginBottom: '16px' }}>
-            <label htmlFor="student-id" className="label">รหัสนักเรียน</label>
-            <input
-              id="student-id"
-              className="input-field"
-              type="text"
-              placeholder="เช่น 67001"
-              value={studentId}
-              onChange={(e) => setStudentId(e.target.value)}
-            />
+          {/* ปีการศึกษา + รหัสนักเรียน */}
+          <div style={rowStyle}>
+            <div>
+              <label htmlFor="student-year" className="label">
+                ปีการศึกษา (พ.ศ.) <span style={{ color: 'var(--rose-text)' }}>*</span>
+              </label>
+              <input
+                id="student-year"
+                className="input-field"
+                type="text"
+                placeholder="เช่น 2569"
+                value={academicYear}
+                onChange={(e) => setAcademicYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="student-id" className="label">รหัสนักเรียน</label>
+              <input
+                id="student-id"
+                className="input-field"
+                type="text"
+                placeholder="เช่น 67001"
+                value={studentId}
+                onChange={(e) => setStudentId(e.target.value)}
+              />
+            </div>
           </div>
 
           {/* ชื่อ - นามสกุล */}
