@@ -10,37 +10,58 @@ import {
   Clock,
   BookOpen,
   Calendar,
-  Layers,
 } from 'lucide-react';
+import { useAuth } from '@/lib/auth';
 import { getStudents, getCalendarEvents } from '@/lib/queries';
 import type { Student, CalendarEvent } from '@/lib/types';
 import { CASE_TYPE_LABELS } from '@/lib/types';
 import { exportMonthlyCasesToExcel } from '@/lib/excel';
 
 export default function ReportsPage() {
+  const { currentUser, isLoading: authLoading } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
+    let isMounted = true;
     const now = new Date();
     const startOfYear = new Date(now.getFullYear(), 0, 1).toISOString();
     const endOfYear = new Date(now.getFullYear(), 11, 31).toISOString();
 
-    Promise.all([
-      getStudents(),
-      getCalendarEvents(startOfYear, endOfYear),
-    ])
-      .then(([s, evs]) => {
-        setStudents(s);
-        setEvents(evs);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error('Reports fetch error:', err);
-        setLoading(false);
-      });
-  }, []);
+    async function loadData(retryCount = 0) {
+      try {
+        const [s, evs] = await Promise.all([
+          getStudents(),
+          getCalendarEvents(startOfYear, endOfYear, undefined, currentUser?.id),
+        ]);
+        if (isMounted) {
+          setStudents(s);
+          setEvents(evs);
+          setLoading(false);
+        }
+      } catch (err: unknown) {
+        const rawMsg = err instanceof Error ? err.message : String(err);
+        if ((rawMsg.includes('unexpected response') || rawMsg.includes('Failed to fetch') || rawMsg.includes('abort')) && retryCount < 2) {
+          setTimeout(() => {
+            if (isMounted) loadData(retryCount + 1);
+          }, 400);
+          return;
+        }
+        if (isMounted) {
+          console.warn('Reports fetch notice:', rawMsg);
+          setLoading(false);
+        }
+      }
+    }
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser, authLoading]);
 
   const totalStudents = students.length;
   const totalCases = events.length;
@@ -54,9 +75,7 @@ export default function ReportsPage() {
     typeBreakdown[label] = (typeBreakdown[label] || 0) + 1;
   });
 
-  // Breakdown by student grade level
-  const kindergartenStudents = students.filter((s) => s.grade?.startsWith('อ') || s.grade?.includes('อนุบาล')).length;
-  const primaryStudents = students.filter((s) => s.grade?.startsWith('ป') || s.grade?.includes('ประถม')).length;
+
 
   return (
     <div className="page-container page-container-fluid" style={{ maxWidth: '100%', width: '100%', padding: '24px 28px 48px', boxSizing: 'border-box' }}>
@@ -323,60 +342,7 @@ export default function ReportsPage() {
               )}
             </div>
 
-            {/* สรุปตามระดับชั้น */}
-            <div
-              className="card"
-              style={{
-                padding: '22px',
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                <Layers size={18} color="var(--primary)" />
-                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  สัดส่วนนักเรียนตามระดับการศึกษา
-                </h3>
-              </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {/* อนุบาล */}
-                <div
-                  style={{
-                    padding: '14px',
-                    borderRadius: 'var(--radius-sm)',
-                    background: 'var(--background)',
-                    border: '1px solid var(--border)',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>ระดับปฐมวัย (อนุบาล 1–3)</span>
-                    <span style={{ fontWeight: 700, color: 'var(--primary-dark)' }}>{kindergartenStudents} คน</span>
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                    เตรียมความพร้อมและพัฒนาการ 4 ด้าน (ร่างกาย อารมณ์ สังคม สติปัญญา)
-                  </div>
-                </div>
-
-                {/* ประถม */}
-                <div
-                  style={{
-                    padding: '14px',
-                    borderRadius: 'var(--radius-sm)',
-                    background: 'var(--background)',
-                    border: '1px solid var(--border)',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>ระดับประถมศึกษา (ป.1–ป.6)</span>
-                    <span style={{ fontWeight: 700, color: 'var(--primary-dark)' }}>{primaryStudents} คน</span>
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                    ทักษะพื้นฐานการเรียนรู้ การแนะแนว และเสริมสร้างความมั่นใจในตนเอง
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         </>
       )}

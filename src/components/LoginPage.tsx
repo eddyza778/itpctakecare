@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
+import logoImg from '../../public/itpctakecare-logo.png';
 import { useAuth } from '@/lib/auth';
 import { getCaretakers, verifyPin } from '@/lib/queries';
 import type { Caretaker } from '@/lib/types';
-import { SchoolLogo } from './SchoolLogo';
 import { Lock, UserCheck, AlertCircle } from 'lucide-react';
 
 export function LoginPage() {
@@ -70,41 +71,22 @@ export function LoginPage() {
       }}
     >
       <div style={{ width: '100%', maxWidth: '400px' }}>
-        {/* School Emblem & Header */}
+        {/* Branding & Logo */}
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <div style={{ display: 'inline-flex', justifyContent: 'center', marginBottom: '14px' }}>
-            <SchoolLogo size="lg" showText={false} />
+          <div style={{ display: 'inline-flex', justifyContent: 'center' }}>
+            <Image
+              src={logoImg}
+              alt="itpctakecare logo"
+              priority
+              style={{
+                width: '210px',
+                height: 'auto',
+                maxWidth: '100%',
+                objectFit: 'contain',
+                mixBlendMode: 'multiply',
+              }}
+            />
           </div>
-          <h1
-            style={{
-              fontSize: '1.25rem',
-              fontWeight: 700,
-              color: 'var(--text-primary)',
-              margin: '0 0 4px',
-              letterSpacing: '-0.01em',
-            }}
-          >
-            โรงเรียนสาธิตมหาวิทยาลัยเชียงใหม่
-          </h1>
-          <p
-            style={{
-              fontSize: '0.875rem',
-              color: 'var(--primary-dark)',
-              fontWeight: 600,
-              margin: 0,
-            }}
-          >
-            ระดับอนุบาลและประถมศึกษา
-          </p>
-          <p
-            style={{
-              fontSize: '0.8125rem',
-              color: 'var(--text-secondary)',
-              margin: '4px 0 0',
-            }}
-          >
-            ระบบบริหารจัดการและปฏิทินดูแลนักเรียน
-          </p>
         </div>
 
         {/* Login Card */}
@@ -206,9 +188,6 @@ export function LoginPage() {
                 fontSize: '1.1rem',
               }}
             />
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-              ค่าเริ่มต้นสำหรับทดสอบ: <strong>1234</strong>
-            </div>
           </div>
 
           <button
@@ -226,10 +205,6 @@ export function LoginPage() {
             {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
           </button>
         </form>
-
-        <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-          ระบบสารสนเทศและการดูแลช่วยเหลือผู้เรียน • Chiang Mai University Demonstration School
-        </div>
       </div>
     </div>
   );

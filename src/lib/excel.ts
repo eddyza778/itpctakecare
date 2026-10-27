@@ -11,7 +11,6 @@ export function exportStudentCasesToExcel(student: Student, cases: CaseWithRelat
   const workbook = XLSX.utils.book_new();
 
   const studentFullName = `${student.first_name_th || ''} ${student.last_name_th || ''}`.trim() || 'ไม่ระบุชื่อ';
-  const academicYearText = student.academic_year ? `ปีการศึกษา ${student.academic_year}` : '-';
 
   // 1. แผ่นงานที่ 1: สรุปเคสการดูแลทั้งหมด
   const caseRows = cases.map((c, index) => {
@@ -24,9 +23,12 @@ export function exportStudentCasesToExcel(student: Student, cases: CaseWithRelat
         ? c.signatures.map((s) => `${s.signer_name} (${s.signer_role})`).join(', ')
         : 'ยังไม่มี';
 
+    const lastUpdated = latestUpdate?.created_at || c.updated_at || c.created_at;
+
     return {
       'ลำดับ': index + 1,
       'วัน-เวลานัดหมาย': safeFormatDate(c.scheduled_at, 'd MMMM yyyy HH:mm น.'),
+      'เวลาอัปเดตล่าสุด': safeFormatDate(lastUpdated, 'd MMMM yyyy HH:mm น.'),
       'ประเภทเคส': typeLabel,
       'สถานะ': c.status === 'done' ? 'เสร็จสิ้น' : 'วางแผน',
       'ผู้ดูแลที่รับผิดชอบ': caretakerNames,
@@ -48,6 +50,7 @@ export function exportStudentCasesToExcel(student: Student, cases: CaseWithRelat
   caseWorksheet['!cols'] = [
     { wch: 6 },  // ลำดับ
     { wch: 24 }, // วัน-เวลานัดหมาย
+    { wch: 24 }, // เวลาอัปเดตล่าสุด
     { wch: 28 }, // ประเภทเคส
     { wch: 12 }, // สถานะ
     { wch: 26 }, // ผู้ดูแลที่รับผิดชอบ
@@ -174,9 +177,12 @@ export function exportMonthlyCasesToExcel(events: CalendarEvent[], monthLabel: s
     const typeLabel =
       e.case_type === 'other' ? e.other_text || 'อื่นๆ' : CASE_TYPE_LABELS[e.case_type];
 
+    const lastUpdated = e.actual_updated_at || e.updated_at || e.created_at;
+
     return {
       'ลำดับ': index + 1,
       'วัน-เวลานัดหมาย': safeFormatDate(e.scheduled_at, 'd MMMM yyyy HH:mm น.'),
+      'เวลาอัปเดตล่าสุด': safeFormatDate(lastUpdated, 'd MMMM yyyy HH:mm น.'),
       'ประเภทเคส': typeLabel,
       'สถานะ': e.status === 'done' ? 'เสร็จสิ้น' : 'วางแผน',
       'จำนวนนักเรียนในเคส (คน)': e.student_count,
@@ -189,7 +195,8 @@ export function exportMonthlyCasesToExcel(events: CalendarEvent[], monthLabel: s
 
   worksheet['!cols'] = [
     { wch: 6 },  // ลำดับ
-    { wch: 26 }, // วัน-เวลา
+    { wch: 24 }, // วัน-เวลานัดหมาย
+    { wch: 24 }, // เวลาอัปเดตล่าสุด
     { wch: 30 }, // ประเภทเคส
     { wch: 14 }, // สถานะ
     { wch: 22 }, // จำนวนนักเรียน
