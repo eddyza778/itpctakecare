@@ -21,6 +21,7 @@ export interface Caretaker {
   id: string;
   name: string;
   role?: CaretakerRole;
+  avatar_url?: string | null;
 }
 
 // ใช้เฉพาะหน้า Admin (รวมบัญชีที่ถูกปิด)
@@ -30,6 +31,7 @@ export interface CaretakerAccount {
   role: CaretakerRole;
   closed_at: string | null;
   created_at: string | null;
+  avatar_url?: string | null;
 }
 
 export const ROLE_LABELS: Record<CaretakerRole, string> = {

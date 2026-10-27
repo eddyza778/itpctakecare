@@ -58,9 +58,16 @@ async function getClosedCaretakerIds(): Promise<string[]> {
 
 export async function getCaretakers(): Promise<Caretaker[]> {
   const db = await getDb();
-  const { data, error } = await db.rpc('get_caretakers');
-  if (error) throw error;
-  return data || [];
+  const { data, error } = await db
+    .from('caretakers')
+    .select('id, name, role, avatar_url')
+    .is('closed_at', null)
+    .order('name');
+  if (!error && data) return data as Caretaker[];
+
+  const { data: rpcData, error: rpcErr } = await db.rpc('get_caretakers');
+  if (rpcErr) throw rpcErr;
+  return rpcData || [];
 }
 
 export async function verifyPin(
@@ -71,6 +78,7 @@ export async function verifyPin(
   caretaker_id?: string;
   name?: string;
   role?: CaretakerRole;
+  avatar_url?: string | null;
   message?: string;
 }> {
   // ลองเรียก login_caretaker (ระบบใหม่ที่มี role และ closed_at)
@@ -80,14 +88,22 @@ export async function verifyPin(
     p_pin: pin,
   });
 
-  if (!error && data) {
-    return data as {
+  if (!error && data && (data as { success?: boolean }).success) {
+    const res = data as {
       success: boolean;
       caretaker_id?: string;
       name?: string;
       role?: CaretakerRole;
+      avatar_url?: string | null;
       message?: string;
     };
+    const { data: ct } = await db
+      .from('caretakers')
+      .select('avatar_url')
+      .eq('id', caretakerId)
+      .single();
+    if (ct?.avatar_url) res.avatar_url = ct.avatar_url;
+    return res;
   }
 
   // Fallback: หากยังไม่ได้รัน 06_roles_and_closing.sql ให้เรียก verify_pin เดิม
@@ -117,7 +133,7 @@ export async function verifyPin(
   // ดึง role และ name ที่แท้จริงจากตาราง caretakers โดยตรง
   const { data: ct } = await db
     .from('caretakers')
-    .select('id, name, role')
+    .select('id, name, role, avatar_url')
     .eq('id', caretakerId)
     .single();
 
@@ -128,6 +144,7 @@ export async function verifyPin(
     caretaker_id: caretakerId,
     name: ct?.name || fb.data?.name || 'ผู้ดูแล',
     role: realRole,
+    avatar_url: ct?.avatar_url || null,
   };
 }
 
@@ -135,6 +152,23 @@ export async function verifyPin(
 export async function getSessionCaretaker(caretakerId: string): Promise<Caretaker | null> {
   try {
     const db = await getDb(caretakerId);
+    // ตรวจสอบจากตาราง caretakers โดยตรง
+    const { data: ct, error: ctErr } = await db
+      .from('caretakers')
+      .select('id, name, role, closed_at, avatar_url')
+      .eq('id', caretakerId)
+      .single();
+
+    if (!ctErr && ct) {
+      if (ct.closed_at) return null; // หากถูกปิดบัญชีแล้ว ให้ logout ทันที
+      return {
+        id: ct.id,
+        name: ct.name,
+        role: (ct.role || 'caretaker') as CaretakerRole,
+        avatar_url: ct.avatar_url || null,
+      };
+    }
+
     const { data, error } = await db.rpc('get_session_caretaker', {
       p_caretaker_id: caretakerId,
     });
@@ -142,21 +176,7 @@ export async function getSessionCaretaker(caretakerId: string): Promise<Caretake
       return data[0] as Caretaker;
     }
 
-    // Fallback: ตรวจสอบจากตาราง caretakers โดยตรง
-    const { data: ct, error: ctErr } = await db
-      .from('caretakers')
-      .select('id, name, role, closed_at')
-      .eq('id', caretakerId)
-      .single();
-
-    if (ctErr || !ct) return null;
-    if (ct.closed_at) return null; // หากถูกปิดบัญชีแล้ว ให้ logout ทันที
-
-    return {
-      id: ct.id,
-      name: ct.name,
-      role: (ct.role || 'caretaker') as CaretakerRole,
-    };
+    return null;
   } catch {
     return null;
   }
@@ -168,20 +188,43 @@ export async function updateOwnProfile(params: {
   currentPin: string;
   name: string;
   newPin: string | null;
+  avatarUrl?: string | null;
 }): Promise<{ success: boolean; message?: string }> {
   try {
     const db = await getDb(params.caretakerId);
-    const { data, error } = await db.rpc('update_own_profile', {
+
+    // ลองเรียก RPC update_own_profile ที่มี p_avatar_url
+    let rpcRes = await db.rpc('update_own_profile', {
       p_caretaker_id: params.caretakerId,
       p_current_pin: params.currentPin,
       p_name: params.name,
       p_new_pin: params.newPin,
+      p_avatar_url: params.avatarUrl !== undefined ? (params.avatarUrl ?? '') : null,
     });
-    if (error) {
-      console.error('RPC update_own_profile error:', error);
-      return { success: false, message: error.message || 'บันทึกไม่สำเร็จ' };
+
+    if (rpcRes.error) {
+      // Fallback: เรียกเวอร์ชัน 4 args เดิม
+      rpcRes = await db.rpc('update_own_profile', {
+        p_caretaker_id: params.caretakerId,
+        p_current_pin: params.currentPin,
+        p_name: params.name,
+        p_new_pin: params.newPin,
+      });
+
+      // ถ้า 4 args สำเร็จ ให้อัปเดต avatar_url ตรงๆ
+      if (!rpcRes.error && params.avatarUrl !== undefined) {
+        await db
+          .from('caretakers')
+          .update({ avatar_url: params.avatarUrl || null })
+          .eq('id', params.caretakerId);
+      }
     }
-    return (data || { success: true }) as { success: boolean; message?: string };
+
+    if (rpcRes.error) {
+      console.error('RPC update_own_profile error:', rpcRes.error);
+      return { success: false, message: rpcRes.error.message || 'บันทึกไม่สำเร็จ' };
+    }
+    return (rpcRes.data || { success: true }) as { success: boolean; message?: string };
   } catch (err: unknown) {
     console.error('updateOwnProfile exception:', err);
     return {

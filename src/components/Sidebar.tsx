@@ -170,9 +170,20 @@ export function Sidebar({ onItemClick }: SidebarProps) {
                 fontSize: '0.875rem',
                 border: '1.5px solid var(--primary-light)',
                 flexShrink: 0,
+                overflow: 'hidden',
               }}
             >
-              {currentUser?.name ? currentUser.name.charAt(0) : <User size={18} />}
+              {currentUser?.avatar_url ? (
+                <img
+                  src={currentUser.avatar_url}
+                  alt={currentUser.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : currentUser?.name ? (
+                currentUser.name.charAt(0)
+              ) : (
+                <User size={18} />
+              )}
             </div>
             <div style={{ minWidth: 0 }}>
               <div
