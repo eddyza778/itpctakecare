@@ -81,7 +81,7 @@ BEGIN
     RETURN json_build_object('success', false, 'message', 'ไม่พบผู้ดูแล หรือบัญชีถูกปิดแล้ว');
   END IF;
 
-  IF r.pin_hash = crypt(p_pin, r.pin_hash) THEN
+  IF r.pin_hash = extensions.crypt(p_pin, r.pin_hash) THEN
     RETURN json_build_object('success', true, 'caretaker_id', r.id, 'name', r.name, 'role', r.role);
   END IF;
 
@@ -124,7 +124,7 @@ BEGIN
   IF v_hash IS NULL THEN
     RETURN json_build_object('success', false, 'message', 'ไม่พบบัญชี หรือบัญชีถูกปิดแล้ว');
   END IF;
-  IF v_hash <> crypt(p_current_pin, v_hash) THEN
+  IF v_hash <> extensions.crypt(p_current_pin, v_hash) THEN
     RETURN json_build_object('success', false, 'message', 'PIN ปัจจุบันไม่ถูกต้อง');
   END IF;
   IF coalesce(trim(p_name), '') = '' THEN
@@ -136,7 +136,7 @@ BEGIN
 
   UPDATE caretakers
      SET name     = trim(p_name),
-         pin_hash = CASE WHEN p_new_pin IS NULL THEN pin_hash ELSE crypt(p_new_pin, gen_salt('bf')) END
+         pin_hash = CASE WHEN p_new_pin IS NULL THEN pin_hash ELSE extensions.crypt(p_new_pin, extensions.gen_salt('bf')) END
    WHERE id = p_caretaker_id;
 
   RETURN json_build_object('success', true);
@@ -189,7 +189,7 @@ BEGIN
   END IF;
 
   INSERT INTO caretakers (name, pin_hash, role)
-  VALUES (trim(p_name), crypt(p_pin, gen_salt('bf')), p_role)
+  VALUES (trim(p_name), extensions.crypt(p_pin, extensions.gen_salt('bf')), p_role)
   RETURNING id INTO v_id;
 
   RETURN v_id;
@@ -227,7 +227,7 @@ BEGIN
   UPDATE caretakers
      SET name     = trim(p_name),
          role     = p_role,
-         pin_hash = CASE WHEN p_new_pin IS NULL THEN pin_hash ELSE crypt(p_new_pin, gen_salt('bf')) END
+         pin_hash = CASE WHEN p_new_pin IS NULL THEN pin_hash ELSE extensions.crypt(p_new_pin, extensions.gen_salt('bf')) END
    WHERE id = p_id;
 END;
 $$;

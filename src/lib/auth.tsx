@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Caretaker } from '@/lib/types';
 import { getSessionCaretaker } from '@/lib/queries';
 
@@ -68,10 +69,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     document.cookie = `itpc_actor_id=${caretaker.id}; path=/; SameSite=Lax; max-age=2592000`;
   };
 
+  const router = useRouter();
+
   const logout = () => {
     setCurrentUser(null);
     localStorage.removeItem(STORAGE_KEY);
     document.cookie = 'itpc_actor_id=; path=/; max-age=0';
+    router.replace('/');
   };
 
   const isAdmin = currentUser?.role === 'admin';

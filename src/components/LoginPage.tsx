@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import logoImg from '../../public/itpctakecare-logo.png';
 import { useAuth } from '@/lib/auth';
@@ -9,6 +10,7 @@ import type { Caretaker } from '@/lib/types';
 import { Lock, UserCheck, AlertCircle } from 'lucide-react';
 
 export function LoginPage() {
+  const router = useRouter();
   const { login } = useAuth();
   const [caretakers, setCaretakers] = useState<Caretaker[]>([]);
   const [selectedId, setSelectedId] = useState('');
@@ -49,6 +51,7 @@ export function LoginPage() {
           name: result.name || found?.name || 'ผู้ดูแล',
           role: result.role || found?.role || 'caretaker',
         });
+        router.replace('/');
       } else {
         setError(result.message || 'PIN ไม่ถูกต้อง');
       }
